@@ -13,6 +13,8 @@ from django.contrib.auth.models import User
 
 from django_bitcoin.utils import *
 
+from util import generateuniquehash
+
 PAYMENT_VALID_HOURS = getattr(settings, "BITCOIND_PAYMENT_VALID_HOURS", 128)
 
 REUSE_ADDRESSES = getattr(settings, "BITCOIND_REUSE_ADDRESSES", True)
@@ -52,9 +54,9 @@ class BitcoinPayment(models.Model):
         return quantitize_bitcoin(Decimal((proportion/Decimal("100.0"))*self.amount))
 
     def add_transaction(self, amount, address):
-        self.withdrawn_total+=am
+        self.withdrawn_total+=amount
         bctrans=BitcoinTransaction()
-        bctrans.amount=am
+        bctrans.amount=amount
         bctrans.address=address
         bctrans.save()
         self.transactions.add(bctrans)
@@ -63,13 +65,15 @@ class BitcoinPayment(models.Model):
     def withdraw_proportion(self, address, proportion):
         if proportion<=Decimal("0") or proportion>Decimal("100"):
             raise Exception("Illegal proportion.")
-        if self.amount-self.withdrawn_total>am:
+
+        amount = self.calculate_amount(proportion)
+
+        if self.amount-self.withdrawn_total > amount:
             raise Exception("Trying to withdraw too much.")
-        am=self.calculate_amount(proportion)
-        self.add_transaction(am, address)
+
+        self.add_transaction(amount, address)
         bitcoin_sendtoaddress(address, amount)
-        return True
-    
+
     @classmethod
     def withdraw_proportion_all(address, bitcoin_payments_proportions):
         """hash BitcoinPayment -> Proportion"""
