@@ -3,24 +3,18 @@ from django.db import models
 import random
 import hashlib
 import base64
-import jsonrpc
-import json
-from django.core.cache import cache
-import urllib
-import urllib2
 from decimal import *
 from django.contrib.sites.models import Site
-import settings
+from django.conf import settings
 import datetime
 #from django
 
 from django.contrib.auth.models import User
 
-from django.db import transaction
+from django_bitcoin.utils import *
 
-PAYMENT_BUFFER_SIZE = getattr(settings, "DBITCOIN_PAYMENT_BUFFER_SIZE", 5)
-CONNECTION_STRING = getattr(settings, "BITCOIND_CONNECTION_STRING", "http://jeremias:kakkanaama@kangasbros.fi:8332")
-MAIN_ACCOUNT = getattr(settings, "BITCOIND_MAIN_ACCOUNT", "somerandomstring14aqqwd")
+from util import generateuniquehash
+
 PAYMENT_VALID_HOURS = getattr(settings, "BITCOIND_PAYMENT_VALID_HOURS", 128)
 
 REUSE_ADDRESSES = getattr(settings, "BITCOIND_REUSE_ADDRESSES", True)
@@ -29,79 +23,10 @@ ESCROW_PAYMENT_TIME_HOURS = getattr(settings, "BITCOIND_ESCROW_PAYMENT_TIME_HOUR
 ESCROW_RELEASE_TIME_DAYS = getattr(settings, "BITCOIND_ESCROW_RELEASE_TIME_DAYS", 14)
 
 
-bitcoind_access = jsonrpc.ServiceProxy(CONNECTION_STRING)
-
 currencies=((1, "USD"), (2, "EUR"), (3, "BTC"))
 confirmation_choices=((0, "0, (quick, recommended)"), (1, "1, (safer, slower for the buyer)"), 
         (5, "5, (for the paranoid, not recommended)"))
 
-# BITCOIND COMMANDS
-
-def quantitize_bitcoin(d):
-    return d.quantize(Decimal("0.00000001"))
-
-def bitcoin_getnewaddress(account_name=MAIN_ACCOUNT):
-    s=bitcoind_access.getnewaddress(account_name)
-    #print s
-    return s
-
-def bitcoin_getbalance(address, minconf=1):
-    s=bitcoind_access.getreceivedbyaddress(address, minconf)
-    #print Decimal(s)
-    return Decimal(s)
-
-def bitcoin_sendtoaddress(address, amount):
-    r=bitcoind_access.sendtoaddress(address, amount)
-    return True
-
-def bitcoinprice_usd():
-    """return bitcoin price from any service we can get it"""
-    if cache.get('bitcoinprice'):
-        return cache.get('bitcoinprice')
-    # try first bitcoincharts
-    try:
-        f = urllib2.urlopen(u"http://bitcoincharts.com/t/weighted_prices.json")
-        result=f.read()
-        j=json.loads(result)
-        cache.set('bitcoinprice', j['USD'], 60*60)
-    except:
-        print "Unexpected error:", sys.exc_info()[0]
-        #raise
-
-    if not cache.get('bitcoinprice'):
-        cache.set('bitcoinprice', cache.get('bitcoinprice_old'), 60*60)
-
-    cache.set('bitcoinprice_old', cache.get('bitcoinprice'), 60*60*24*7)
-    return cache.get('bitcoinprice')
-
-def bitcoinprice_eur():
-    """return bitcoin price from any service we can get it"""
-    if cache.get('bitcoinprice_eur'):
-        return cache.get('bitcoinprice_eur')
-    # try first bitcoincharts
-    try:
-        f = urllib2.urlopen(u"http://bitcoincharts.com/t/weighted_prices.json")
-        result=f.read()
-        j=json.loads(result)
-        cache.set('bitcoinprice_eur', j['EUR'], 60*60)
-    except:
-        print "Unexpected error:", sys.exc_info()[0]
-        #raise
-
-    if not cache.get('bitcoinprice_eur'):
-        if not cache.get('bitcoinprice_eur_old'):
-             raise NameError('Not any currency data')
-        cache.set('bitcoinprice_eur', cache.get('bitcoinprice_eur_old'), 60*60)
-        cache.set('bitcoinprice_eur_old', cache.get('bitcoinprice_eur'), 60*60*24*7)
-
-    return cache.get('bitcoinprice')
-
-def bitcoinprice(currency):
-    if currency=="USD" or currency==1:
-        return Decimal(bitcoinprice_usd()['24h'])
-    elif currency=="EUR" or currency==2:
-        return Decimal(bitcoinprice_eur()['24h'])
-    return Decimal("1.0")
 
 class BitcoinTransaction(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
@@ -121,6 +46,8 @@ class BitcoinPayment(models.Model):
 
     paid_at = models.DateTimeField(null=True, default=None)
 
+    withdrawn_at = models.DateTimeField(null=True, default=None)
+
     withdrawn_total = models.DecimalField(max_digits=16, decimal_places=8, default=Decimal("0.0"))
 
     transactions = models.ManyToManyField(BitcoinTransaction)
@@ -129,9 +56,9 @@ class BitcoinPayment(models.Model):
         return quantitize_bitcoin(Decimal((proportion/Decimal("100.0"))*self.amount))
 
     def add_transaction(self, amount, address):
-        self.withdrawn_total+=am
+        self.withdrawn_total+=amount
         bctrans=BitcoinTransaction()
-        bctrans.amount=am
+        bctrans.amount=amount
         bctrans.address=address
         bctrans.save()
         self.transactions.add(bctrans)
@@ -140,13 +67,15 @@ class BitcoinPayment(models.Model):
     def withdraw_proportion(self, address, proportion):
         if proportion<=Decimal("0") or proportion>Decimal("100"):
             raise Exception("Illegal proportion.")
-        if self.amount-self.withdrawn_total>am:
+
+        amount = self.calculate_amount(proportion)
+
+        if self.amount-self.withdrawn_total > amount:
             raise Exception("Trying to withdraw too much.")
-        am=self.calculate_amount(proportion)
-        self.add_transaction(am, address)
+
+        self.add_transaction(amount, address)
         bitcoin_sendtoaddress(address, amount)
-        return True
-    
+
     @classmethod
     def withdraw_proportion_all(address, bitcoin_payments_proportions):
         """hash BitcoinPayment -> Proportion"""
@@ -163,7 +92,7 @@ class BitcoinPayment(models.Model):
         """hash address -> percentage (string -> Decimal)"""
         if self.amount_paid<self.amount:
             raise Exception("Not paid.")
-        if withdrawn_at:
+        if self.withdrawn_at:
             raise Exception("Trying to withdraw again.")
         if sum(addresses_shares.values())>100:
             raise Exception("Sum of proportions must be <=100.")
@@ -267,38 +196,3 @@ class BitcoinEscrow(models.Model):
     def get_absolute_url(self):
         return ('view_or_url_name' )
 
-
-def RefillPaymentQueue():
-    c=BitcoinPayment.objects.filter(active=False).count()
-    if PAYMENT_BUFFER_SIZE>c:
-        for i in range(0,PAYMENT_BUFFER_SIZE-c):
-            bp=BitcoinPayment()
-            bp.address=bitcoin_getnewaddress()
-            bp.save()
-
-def UpdatePayments():
-    if not cache.get('last_full_check'):
-        cache.set('bitcoinprice', cache.get('bitcoinprice_old'))
-    bps=BitcoinPayment.objects.filter(active=True)
-    for bp in bps:
-        bp.amount_paid=Decimal(bitcoin_getbalance(bp.address))
-        bp.save()
-        print bp.amount
-        print bp.amount_paid
-    
-    
-@transaction.commit_on_success
-def getNewBitcoinPayment(amount):
-    bp=BitcoinPayment.objects.filter(active=False)
-    if len(bp)<1:
-        RefillPaymentQueue()
-        bp=BitcoinPayment.objects.filter(active=False)
-    bp=bp[0]
-    bp.active=True
-    bp.amount=amount
-    bp.save()
-    return bp
-
-def getNewBitcoinPayment_eur(amount):
-    print bitcoinprice_eur()
-    return getNewBitcoinPayment(Decimal(amount)/Decimal(bitcoinprice_eur()['24h']))
