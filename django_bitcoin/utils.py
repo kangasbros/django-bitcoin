@@ -92,7 +92,8 @@ def bitcoinprice(currency):
         return Decimal(bitcoinprice_usd()['24h'])
     elif currency=="EUR" or currency==2:
         return Decimal(bitcoinprice_eur()['24h'])
-    return Decimal("1.0")
+
+    raise NotImplementedError('This currency is not implemented')
 
 def RefillPaymentQueue():
     c=BitcoinPayment.objects.filter(active=False).count()
