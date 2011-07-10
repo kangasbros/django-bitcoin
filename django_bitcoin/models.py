@@ -46,6 +46,8 @@ class BitcoinPayment(models.Model):
 
     paid_at = models.DateTimeField(null=True, default=None)
 
+    withdrawn_at = models.DateTimeField(null=True, default=None)
+
     withdrawn_total = models.DecimalField(max_digits=16, decimal_places=8, default=Decimal("0.0"))
 
     transactions = models.ManyToManyField(BitcoinTransaction)
@@ -90,7 +92,7 @@ class BitcoinPayment(models.Model):
         """hash address -> percentage (string -> Decimal)"""
         if self.amount_paid<self.amount:
             raise Exception("Not paid.")
-        if withdrawn_at:
+        if self.withdrawn_at:
             raise Exception("Trying to withdraw again.")
         if sum(addresses_shares.values())>100:
             raise Exception("Sum of proportions must be <=100.")
