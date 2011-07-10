@@ -1,6 +1,6 @@
 # vim: tabstop=4 expandtab autoindent shiftwidth=4 fileencoding=utf-8
 
-import settings
+from django.conf import settings
 
 from django.core.cache import cache
 

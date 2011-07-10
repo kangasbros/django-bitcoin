@@ -5,7 +5,7 @@ import hashlib
 import base64
 from decimal import *
 from django.contrib.sites.models import Site
-import settings
+from django.conf import settings
 import datetime
 #from django
 
