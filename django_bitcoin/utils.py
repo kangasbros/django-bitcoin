@@ -4,8 +4,6 @@ from django.conf import settings
 
 from django.core.cache import cache
 
-from django_bitcoin.models import BitcoinPayment
-
 from django.db import transaction
 
 from decimal import *
@@ -19,6 +17,8 @@ import sys
 import urllib
 
 import urllib2
+
+import random
 
 MAIN_ACCOUNT = getattr(settings, "BITCOIND_MAIN_ACCOUNT", "somerandomstring14aqqwd")
 CONNECTION_STRING = getattr(settings, "BITCOIND_CONNECTION_STRING", "http://jeremias:kakkanaama@kangasbros.fi:8332")
@@ -95,40 +95,39 @@ def bitcoinprice(currency):
 
     raise NotImplementedError('This currency is not implemented')
 
-def RefillPaymentQueue():
-    c=BitcoinPayment.objects.filter(active=False).count()
-    if PAYMENT_BUFFER_SIZE>c:
-        for i in range(0,PAYMENT_BUFFER_SIZE-c):
-            bp=BitcoinPayment()
-            bp.address=bitcoin_getnewaddress()
-            bp.save()
 
-def UpdatePayments():
-    if not cache.get('last_full_check'):
-        cache.set('bitcoinprice', cache.get('bitcoinprice_old'))
-    bps=BitcoinPayment.objects.filter(active=True)
-    for bp in bps:
-        bp.amount_paid=Decimal(bitcoin_getbalance(bp.address))
-        bp.save()
-        print bp.amount
-        print bp.amount_paid
-    
-    
-@transaction.commit_on_success
-def getNewBitcoinPayment(amount):
-    bp=BitcoinPayment.objects.filter(active=False)
-    if len(bp)<1:
-        RefillPaymentQueue()
-        bp=BitcoinPayment.objects.filter(active=False)
-    bp=bp[0]
-    bp.active=True
-    bp.amount=amount
-    bp.save()
-    return bp
+# generate a hash
+def generateuniquehash(length=43, extradata=''):
+    r=str(random.random())
+    m = hashlib.sha256()
+    m.update(r+str(extradata))
+    key=m.digest()
+    key=base64.urlsafe_b64encode(key)
+    return key[:min(length, 43)]
 
-def getNewBitcoinPayment_eur(amount):
-    print bitcoinprice_eur()
-    return getNewBitcoinPayment(Decimal(amount)/Decimal(bitcoinprice_eur()['24h']))
+import string
 
-# EOF
+ALPHABET = string.ascii_uppercase + string.ascii_lowercase + \
+           string.digits + '_'
+ALPHABET_REVERSE = dict((c, i) for (i, c) in enumerate(ALPHABET))
+BASE = len(ALPHABET)
+SIGN_CHARACTER = '-'
+
+def int2base64(n):
+    if n < 0:
+        return SIGN_CHARACTER + num_encode(-n)
+    s = []
+    while True:
+        n, r = divmod(n, BASE)
+        s.append(ALPHABET[r])
+        if n == 0: break
+    return ''.join(reversed(s))
+
+def base642int(s):
+    if s[0] == SIGN_CHARACTER:
+        return -num_decode(s[1:])
+    n = 0
+    for c in s:
+        n = n * BASE + ALPHABET_REVERSE[c]
+    return n
 

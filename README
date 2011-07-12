@@ -1,1 +1,28 @@
 Magical ponies
+
+USAGE
+=====
+
+BitcoinPayment is the most usable class currently, ignore the others.
+
+Currently works at follow:
+
+from django_bitcoin import BitcoinPayment, getNewBitcoinPayment, bitcoinprice
+from decimal import Decimal
+
+bp=getNewBitcoinPayment(Decimal("0.32"))
+bp2=getNewBitcoinPayment(Decimal("0.99")/bitcoinprice("USD")) # convert from USD
+
+if bp.is_paid(minconf=5):
+    # send 5% of payment to bitcoin address someaddress
+    bp.withdraw_proportion(someaddress, Decimal("5.0"))
+    if bp.is_paid() and bp2.is_paid():
+        # send from both bp and bp2 (95% from both, only single bitcoin transaction)
+        BitcoinPayment.withdraw_all(someaddress2,  {bp, bp2})
+
+NOTE
+====
+
+I don't have time to answer to email support requests, sorry guys.
+
+The API _WILL_ change, so don't use this now unless you know what you are doing (and can fork it and develop it further yourself).

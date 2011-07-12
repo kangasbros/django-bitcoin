@@ -1,3 +1,3 @@
-from models import BitcoinPayment
-from util import generateuniquehash, int2base64, base642int
+from models import BitcoinPayment, getNewBitcoinPayment
+from utils import generateuniquehash, int2base64, base642int, bitcoinprice
 

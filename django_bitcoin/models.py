@@ -13,15 +13,12 @@ from django.contrib.auth.models import User
 
 from django_bitcoin.utils import *
 
-from util import generateuniquehash
-
 PAYMENT_VALID_HOURS = getattr(settings, "BITCOIND_PAYMENT_VALID_HOURS", 128)
 
 REUSE_ADDRESSES = getattr(settings, "BITCOIND_REUSE_ADDRESSES", True)
 
 ESCROW_PAYMENT_TIME_HOURS = getattr(settings, "BITCOIND_ESCROW_PAYMENT_TIME_HOURS", 4)
 ESCROW_RELEASE_TIME_DAYS = getattr(settings, "BITCOIND_ESCROW_RELEASE_TIME_DAYS", 14)
-
 
 currencies=((1, "USD"), (2, "EUR"), (3, "BTC"))
 confirmation_choices=((0, "0, (quick, recommended)"), (1, "1, (safer, slower for the buyer)"), 
@@ -195,4 +192,42 @@ class BitcoinEscrow(models.Model):
     @models.permalink
     def get_absolute_url(self):
         return ('view_or_url_name' )
+
+def RefillPaymentQueue():
+    c=BitcoinPayment.objects.filter(active=False).count()
+    if PAYMENT_BUFFER_SIZE>c:
+        for i in range(0,PAYMENT_BUFFER_SIZE-c):
+            bp=BitcoinPayment()
+            bp.address=bitcoin_getnewaddress()
+            bp.save()
+
+def UpdatePayments():
+    if not cache.get('last_full_check'):
+        cache.set('bitcoinprice', cache.get('bitcoinprice_old'))
+    bps=BitcoinPayment.objects.filter(active=True)
+    for bp in bps:
+        bp.amount_paid=Decimal(bitcoin_getbalance(bp.address))
+        bp.save()
+        print bp.amount
+        print bp.amount_paid
+    
+    
+@transaction.commit_on_success
+def getNewBitcoinPayment(amount):
+    bp=BitcoinPayment.objects.filter(active=False)
+    if len(bp)<1:
+        RefillPaymentQueue()
+        bp=BitcoinPayment.objects.filter(active=False)
+    bp=bp[0]
+    bp.active=True
+    bp.amount=amount
+    bp.save()
+    return bp
+
+def getNewBitcoinPayment_eur(amount):
+    print bitcoinprice_eur()
+    return getNewBitcoinPayment(Decimal(amount)/Decimal(bitcoinprice_eur()['24h']))
+
+# EOF
+
 
