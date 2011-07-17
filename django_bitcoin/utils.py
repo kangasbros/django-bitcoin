@@ -19,6 +19,8 @@ import urllib
 import urllib2
 
 import random
+import hashlib
+import base64
 
 MAIN_ACCOUNT = getattr(settings, "BITCOIND_MAIN_ACCOUNT", "somerandomstring14aqqwd")
 CONNECTION_STRING = getattr(settings, "BITCOIND_CONNECTION_STRING", "http://jeremias:kakkanaama@kangasbros.fi:8332")
@@ -37,6 +39,11 @@ def bitcoin_getnewaddress(account_name=MAIN_ACCOUNT):
     return s
 
 def bitcoin_getbalance(address, minconf=1):
+    s=bitcoind_access.getreceivedbyaddress(address, minconf)
+    #print Decimal(s)
+    return Decimal(s)
+
+def bitcoin_getreceived(address, minconf=1):
     s=bitcoind_access.getreceivedbyaddress(address, minconf)
     #print Decimal(s)
     return Decimal(s)
@@ -60,6 +67,8 @@ def bitcoinprice_usd():
         #raise
 
     if not cache.get('bitcoinprice'):
+        if not cache.get('bitcoinprice_old'):
+            return {'24h': Decimal("13.4")}
         cache.set('bitcoinprice', cache.get('bitcoinprice_old'), 60*60)
 
     cache.set('bitcoinprice_old', cache.get('bitcoinprice'), 60*60*24*7)
@@ -81,7 +90,8 @@ def bitcoinprice_eur():
 
     if not cache.get('bitcoinprice_eur'):
         if not cache.get('bitcoinprice_eur_old'):
-             raise NameError('Not any currency data')
+            return {'24h': Decimal("10.0")}
+            #raise NameError('Not any currency data')
         cache.set('bitcoinprice_eur', cache.get('bitcoinprice_eur_old'), 60*60)
         cache.set('bitcoinprice_eur_old', cache.get('bitcoinprice_eur'), 60*60*24*7)
 

@@ -30,6 +30,17 @@ class BitcoinTransaction(models.Model):
     amount = models.DecimalField(max_digits=16, decimal_places=8, default=Decimal("0.0"))
     address = models.CharField(max_length=50)
 
+class BitcoinAddress(models.Model):
+    address = models.CharField(max_length=50, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    active = models.BooleanField(default=False)
+
+    def received(self, minconf=2):
+        return Decimal(bitcoin_getreceived(self.address, minconf=minconf))
+
+    def __unicode__(self):
+        return self.address
+
 class BitcoinPayment(models.Model):
     """docstring"""
     description = models.CharField(max_length=255, blank=True)
@@ -43,11 +54,20 @@ class BitcoinPayment(models.Model):
 
     paid_at = models.DateTimeField(null=True, default=None)
 
-    withdrawn_at = models.DateTimeField(null=True, default=None)
-
     withdrawn_total = models.DecimalField(max_digits=16, decimal_places=8, default=Decimal("0.0"))
 
     transactions = models.ManyToManyField(BitcoinTransaction)
+
+    # def __init__(self, amount, currency):
+    #     bp=BitcoinPayment.objects.filter(active=False)
+    #     if len(bp)<1:
+    #         RefillPaymentQueue()
+    #         bp=BitcoinPayment.objects.filter(active=False)
+    #     bp=bp[0]
+    #     bp.active=True
+    #     bp.amount=amount
+    #     bp.save()
+    #     return bp
     
     def calculate_amount(self, proportion):
         return quantitize_bitcoin(Decimal((proportion/Decimal("100.0"))*self.amount))
@@ -167,6 +187,57 @@ class BitcoinPayment(models.Model):
     def get_absolute_url(self):
         return ('view_or_url_name')
 
+class BitcoinWalletTransaction(models.Model):
+    created_at = models.DateTimeField(auto_now_add=True)
+    from_wallet = models.ForeignKey('BitcoinWallet', related_name="from_transactions")
+    to_wallet = models.ForeignKey('BitcoinWallet', null=True, related_name="to_transactions")
+    to_bitcoinaddress = models.CharField(max_length=50, blank=True)
+    amount = models.DecimalField(max_digits=16, decimal_places=8, default=Decimal("0.0"))
+
+class BitcoinWallet(models.Model):
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    addresses = models.ManyToManyField(BitcoinAddress)
+
+    def send_to_wallet(self, otherWallet, amount):
+        if amount<self.total_balance():
+            raise Exception(_("Trying to send too much"))
+        if self==otherWallet:
+            raise Exception(_("Can't send to self-wallet"))
+        if not otherWallet.id or not self.id:
+            raise Exception(_("Some of the wallets not saved"))
+        bwt=BitcoinWalletTransaction()
+        bwt.amount=amount
+        bwt.from_wallet=self
+        bwt.to_wallet=otherWallet
+        bwt.save()
+
+    def send_to_address(self, address, amount):
+        if amount<self.total_balance():
+            raise Exception(_("Trying to send too much"))
+        if self==otherWallet:
+            raise Exception(_("Can't send to self-wallet"))
+        if not otherWallet.id or not self.id:
+            raise Exception(_("Some of the wallets not saved"))
+        bwt=BitcoinWalletTransaction()
+        bwt.amount=amount
+        bwt.from_wallet=self
+        bwt.to_bitcoinaddress=address
+        bwt.save()
+        bitcoin_sendtoaddress(address, amount)
+
+    def total_received(self):
+        """docstring for getreceived"""
+        s=sum([a.received() for a in addresses])
+        return (s+BitcoinWalletTransaction.objects.filter(to_wallet=self).sum(amount))
+
+    def total_sent(self):
+        return (BitcoinWalletTransaction.objects.filter(from_wallet=self).sum(amount))
+
+    def total_balance(self):
+        return self.total_received()-self.total_sent()
+
 class BitcoinEscrow(models.Model):
     """Bitcoin escrow payment"""
     
@@ -200,6 +271,12 @@ def RefillPaymentQueue():
             bp=BitcoinPayment()
             bp.address=bitcoin_getnewaddress()
             bp.save()
+    c=BitcoinAddress.objects.filter(active=False).count()
+    if PAYMENT_BUFFER_SIZE>c:
+        for i in range(0,PAYMENT_BUFFER_SIZE-c):
+            ba=BitcoinAddress()
+            ba.address=bitcoin_getnewaddress()
+            ba.save()
 
 def UpdatePayments():
     if not cache.get('last_full_check'):
@@ -210,8 +287,7 @@ def UpdatePayments():
         bp.save()
         print bp.amount
         print bp.amount_paid
-    
-    
+
 @transaction.commit_on_success
 def getNewBitcoinPayment(amount):
     bp=BitcoinPayment.objects.filter(active=False)
