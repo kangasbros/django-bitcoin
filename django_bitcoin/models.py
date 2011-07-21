@@ -164,7 +164,8 @@ class BitcoinPayment(models.Model):
 
     def update_payment(self, minconf=1):
         new_amount=Decimal(bitcoin_getbalance(self.address, minconf=minconf))
-        if new_amount>=self.amount_paid:
+        print "blaa", new_amount, self.address
+        if new_amount>=self.amount:
             self.amount_paid=new_amount
             self.paid_at=datetime.datetime.now()
             self.save()
@@ -238,6 +239,14 @@ class BitcoinWallet(models.Model):
     def total_balance(self):
         return self.total_received()-self.total_sent()
 
+class FiatWalletTransaction(models.Model):
+    """Transaction for storing fiat currencies"""
+    pass
+
+class FiatWallet(models.Model):
+    """Wallet for storing fiat currencies"""
+    pass
+
 class BitcoinEscrow(models.Model):
     """Bitcoin escrow payment"""
     
@@ -264,7 +273,7 @@ class BitcoinEscrow(models.Model):
     def get_absolute_url(self):
         return ('view_or_url_name' )
 
-def RefillPaymentQueue():
+def refill_payment_queue():
     c=BitcoinPayment.objects.filter(active=False).count()
     if PAYMENT_BUFFER_SIZE>c:
         for i in range(0,PAYMENT_BUFFER_SIZE-c):
@@ -278,7 +287,7 @@ def RefillPaymentQueue():
             ba.address=bitcoin_getnewaddress()
             ba.save()
 
-def UpdatePayments():
+def update_payments():
     if not cache.get('last_full_check'):
         cache.set('bitcoinprice', cache.get('bitcoinprice_old'))
     bps=BitcoinPayment.objects.filter(active=True)
@@ -289,10 +298,10 @@ def UpdatePayments():
         print bp.amount_paid
 
 @transaction.commit_on_success
-def getNewBitcoinPayment(amount):
+def new_bitcoin_payment(amount):
     bp=BitcoinPayment.objects.filter(active=False)
     if len(bp)<1:
-        RefillPaymentQueue()
+        refill_payment_queue()
         bp=BitcoinPayment.objects.filter(active=False)
     bp=bp[0]
     bp.active=True
@@ -300,9 +309,16 @@ def getNewBitcoinPayment(amount):
     bp.save()
     return bp
 
-def getNewBitcoinPayment_eur(amount):
+def getNewBitcoinPayment(amount):
+    return new_bitcoin_payment(amount)
+
+@transaction.commit_on_success
+def new_bitcoin_payment_eur(amount):
     print bitcoinprice_eur()
-    return getNewBitcoinPayment(Decimal(amount)/Decimal(bitcoinprice_eur()['24h']))
+    return new_bitcoin_payment(Decimal(amount)/Decimal(bitcoinprice_eur()['24h']))
+
+def getNewBitcoinPayment_eur(amount):
+    return new_bitcoin_payment_eur(amount)
 
 # EOF
 
