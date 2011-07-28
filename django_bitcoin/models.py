@@ -94,10 +94,11 @@ class BitcoinPayment(models.Model):
         bitcoin_sendtoaddress(address, amount)
 
     @classmethod
-    def withdraw_proportion_all(address, bitcoin_payments_proportions):
+    def withdraw_proportion_all(cls, address, bitcoin_payments_proportions):
         """hash BitcoinPayment -> Proportion"""
         final_amount=Decimal("0.0")
-        for bp, proportion in bitcoin_payments_proportions:
+        print bitcoin_payments_proportions
+        for bp, proportion in bitcoin_payments_proportions.iteritems():
             am=bp.calculate_amount(proportion)
             final_amount+=am
             bp.add_transaction(am, address)

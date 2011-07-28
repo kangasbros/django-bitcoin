@@ -49,7 +49,7 @@ def bitcoin_getreceived(address, minconf=1):
     return Decimal(s)
 
 def bitcoin_sendtoaddress(address, amount):
-    r=bitcoind_access.sendtoaddress(address, amount)
+    r=bitcoind_access.sendtoaddress(address, float(amount))
     return True
 
 def bitcoinprice_usd():
@@ -118,10 +118,10 @@ def generateuniquehash(length=43, extradata=''):
 import string
 
 ALPHABET = string.ascii_uppercase + string.ascii_lowercase + \
-           string.digits + '_'
+           string.digits + '_-'
 ALPHABET_REVERSE = dict((c, i) for (i, c) in enumerate(ALPHABET))
 BASE = len(ALPHABET)
-SIGN_CHARACTER = '-'
+SIGN_CHARACTER = '%'
 
 def int2base64(n):
     if n < 0:
