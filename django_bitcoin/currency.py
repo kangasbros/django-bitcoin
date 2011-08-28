@@ -163,7 +163,7 @@ class BitcoinChartsCurrency(Currency):
         else:
             self.populate_cache()
             factor = cache.get(self.cache_key)[self.period]
-        return factor
+        return decimal.Decimal(factor)
 
     def to_btc(self, amount):
         return amount / self.get_factor()
