@@ -28,6 +28,9 @@ class TemporaryConversionError(ConversionError):
     pass 
 
 class Exchange(object):
+    def __init__(self):
+        self.currencies = {}
+
     def register_currency(self, klass):
         self.currencies[klass.identifier] = klass
 
