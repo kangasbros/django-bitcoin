@@ -41,6 +41,17 @@ class BitcoinAddress(models.Model):
     def __unicode__(self):
         return self.address
 
+@transaction.commit_on_success
+def new_bitcoin_address(amount):
+    bp=BitcoinAddress.objects.filter(active=False)
+    if len(bp)<1:
+        refill_payment_queue()
+        bp=BitcoinAddress.objects.filter(active=False)
+    bp=bp[0]
+    bp.active=True
+    bp.save()
+    return bp
+
 class BitcoinPayment(models.Model):
     """docstring"""
     description = models.CharField(max_length=255, blank=True)
@@ -202,6 +213,13 @@ class BitcoinWallet(models.Model):
 
     addresses = models.ManyToManyField(BitcoinAddress)
 
+    def receiving_address(self):
+        if self.addresses.count>0:
+            return self.addresses.all()[0].address
+        self.addresses.add(new_bitcoin_address())
+        self.save()
+        return self.addresses.all()[0].address
+
     def send_to_wallet(self, otherWallet, amount):
         if amount<self.total_balance():
             raise Exception(_("Trying to send too much"))
@@ -239,6 +257,8 @@ class BitcoinWallet(models.Model):
 
     def total_balance(self):
         return self.total_received()-self.total_sent()
+
+### Maybe in the future
 
 class FiatWalletTransaction(models.Model):
     """Transaction for storing fiat currencies"""
