@@ -36,7 +36,7 @@ class Exchange(object):
 
     def get_rate(self, currency, to="BTC"):
         """Rate is inferred from a dummy exchange"""
-        start = Money("1.0", currency)
+        start = Money(currency, "1.0")
         end = self(start_amount, to)
         return end.amount
 
