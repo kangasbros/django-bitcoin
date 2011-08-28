@@ -19,6 +19,21 @@ code. Default `exchange` uses Bitcoincharts.
 
 import decimal
 
+from django.core.cache import cache
+
+import json
+import jsonrpc
+import sys
+import urllib
+import urllib2
+import random
+import hashlib
+import base64
+from decimal import Decimal
+import decimal
+import warnings
+
+
 from django_bitcoin import settings
 
 class ConversionError(Exception):
