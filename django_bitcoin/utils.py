@@ -19,6 +19,11 @@ from django.db import transaction
 from django_bitcoin import settings
 from django_bitcoin import currency
 
+BITCOIN_MINIMUM_CONFIRMATIONS = getattr(
+    settings, 
+    "BITCOIN_MINIMUM_CONFIRMATIONS", 
+    0)
+
 # BITCOIND COMMANDS
 
 def quantitize_bitcoin(d):
@@ -29,9 +34,9 @@ class BitcoindConnection(object):
         self.bitcoind_api = jsonrpc.ServiceProxy(connection_string)
         self.account_name = main_account_name
 
-    def total_received(self, address, *args, **kwargs):
+    def total_received(self, address, minconf=BITCOIN_MINIMUM_CONFIRMATIONS):
         return decimal.Decimal(
-            self.bitcoind_api.getreceivedbyaddress(address, *args, **kwargs))
+            self.bitcoind_api.getreceivedbyaddress(address, minconf))
     
     def send(self, address, amount, *args, **kwargs):
         self.bitcoind_api.sendtoaddress(address, float(amount), *args, **kwargs)
@@ -53,7 +58,7 @@ def bitcoin_getbalance(address, minconf=1):
                   DeprecationWarning)
     return bitcoind.total_received(address, minconf)
 
-def bitcoin_getreceived(address, minconf=1):
+def bitcoin_getreceived(address, minconf=BITCOIN_MINIMUM_CONFIRMATIONS):
     warnings.warn("Use bitcoind.total_received(...) instead",
                   DeprecationWarning)
     return bitcoind.total_received(address, minconf)

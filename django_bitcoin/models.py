@@ -15,6 +15,8 @@ from django_bitcoin.utils import *
 from django_bitcoin.utils import bitcoind
 from django_bitcoin import settings
 
+from django.utils.translation import ugettext as _
+
 PAYMENT_VALID_HOURS = getattr(
     settings, 
     "BITCOIND_PAYMENT_VALID_HOURS", 
@@ -24,6 +26,11 @@ PAYMENT_BUFFER_SIZE = getattr(
     settings, 
     "PAYMENT_BUFFER_SIZE", 
     5)
+
+BITCOIN_MINIMUM_CONFIRMATIONS = getattr(
+    settings, 
+    "BITCOIN_MINIMUM_CONFIRMATIONS", 
+    0)
 
 REUSE_ADDRESSES = getattr(
     settings, 
@@ -65,7 +72,7 @@ class BitcoinAddress(models.Model):
     created_at = models.DateTimeField(default=datetime.datetime.now)
     active = models.BooleanField(default=False)
 
-    def received(self, minconf=2):
+    def received(self, minconf=BITCOIN_MINIMUM_CONFIRMATIONS):
         return bitcoind.total_received(self.address, minconf=minconf)
 
     def __unicode__(self):
