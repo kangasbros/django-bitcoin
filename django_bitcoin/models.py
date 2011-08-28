@@ -19,6 +19,11 @@ PAYMENT_VALID_HOURS = getattr(
     "BITCOIND_PAYMENT_VALID_HOURS", 
     128)
 
+PAYMENT_BUFFER_SIZE = getattr(
+    settings, 
+    "PAYMENT_BUFFER_SIZE", 
+    5)
+
 REUSE_ADDRESSES = getattr(
     settings, 
     "BITCOIND_REUSE_ADDRESSES", 
@@ -66,7 +71,7 @@ class BitcoinAddress(models.Model):
         return self.address
 
 @transaction.commit_on_success
-def new_bitcoin_address(amount):
+def new_bitcoin_address():
     bp=BitcoinAddress.objects.filter(active=False)
     if len(bp)<1:
         refill_payment_queue()
@@ -221,7 +226,7 @@ class Payment(models.Model):
     
     def save(self, **kwargs):
         self.updated_at = datetime.datetime.now()
-        return super(BitcoinPayment, self).save(**kwargs)
+        return super(Payment, self).save(**kwargs)
 
     @models.permalink
     def get_absolute_url(self):
@@ -273,7 +278,6 @@ class Wallet(models.Model):
             from_wallet=self,
             to_wallet=otherWallet)
 
-
     def send_to_address(self, address, amount):
         if amount<self.total_balance():
             raise Exception(_("Trying to send too much"))
@@ -290,18 +294,19 @@ class Wallet(models.Model):
 
     def total_received(self):
         """docstring for getreceived"""
-        s=sum([a.received() for a in self.addresses])
-        return (s+self.received_transactions.sum("amount"))
+        s=sum([a.received() for a in self.addresses.all()])
+        rt=self.received_transactions.aggregate(models.Sum("amount"))['amount__sum'] or Decimal(0)
+        return (s+rt)
 
     def total_sent(self):
-        return self.sent_transactions.sum("amount")
+        return self.sent_transactions.aggregate(models.Sum("amount"))['amount__sum'] or Decimal(0)
 
     def total_balance(self):
         return self.total_received() - self.total_sent()
 
     def save(self, **kwargs):
         self.updated_at = datetime.datetime.now()
-        super(BitcoinWallet, self).save(**kwargs)
+        super(Wallet, self).save(**kwargs)
 
 ### Maybe in the future
 
@@ -321,7 +326,7 @@ class BitcoinEscrow(models.Model):
 
     seller = models.ForeignKey(User)
     
-    bitcoin_payment = models.ForeignKey(BitcoinPayment)
+    bitcoin_payment = models.ForeignKey(Payment)
 
     confirm_hash = models.CharField(max_length=50, blank=True)
     
@@ -342,10 +347,10 @@ class BitcoinEscrow(models.Model):
         return ('view_or_url_name',)
 
 def refill_payment_queue():
-    c=BitcoinPayment.objects.filter(active=False).count()
+    c=Payment.objects.filter(active=False).count()
     if PAYMENT_BUFFER_SIZE>c:
         for i in range(0,settings.PAYMENT_BUFFER_SIZE-c):
-            bp=BitcoinPayment()
+            bp=Payment()
             bp.address=bitcoin_getnewaddress()
             bp.save()
     c=BitcoinAddress.objects.filter(active=False).count()
