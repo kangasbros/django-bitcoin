@@ -44,16 +44,16 @@ class Exchange(object):
         """Gets the current equivalent amount of the given Money in
         the target currency
         """
-        if not hasattr(unit, "identifier"):
+        if not hasattr(money, "identifier"):
             raise ConversionError(
                 "Use annotated currency (e.g. Money) as "
                 "the unit argument")
 
-        if unit.identifier not in self.currencies:
+        if money.identifier not in self.currencies:
             raise ConversionError(
                 "Unknown source currency %(identifier)s. "
                 "Available currencies: %(currency_list)s" % {
-                    "identifier": unit.identifier, 
+                    "identifier": money.identifier, 
                     "currency_list": u", ".join(self.currencies.keys())})
 
         if to not in self.currencies:
@@ -63,8 +63,8 @@ class Exchange(object):
                     "identifier": to, 
                     "currency_list": u", ".join(self.currencies.keys())})
 
-        btc = self.currencies[unit.identifier].to_btc(unit.amount)
-        return Money(to, self.currencies[to].from_btc(unit.amount))
+        btc = self.currencies[money.identifier].to_btc(money.amount)
+        return Money(to, self.currencies[to].from_btc(money.amount))
 
 class Money(object):
     def __init__(self, identifier, amount, *args, **kwargs):
