@@ -79,7 +79,7 @@ class Exchange(object):
                     "currency_list": u", ".join(self.currencies.keys())})
 
         btc = self.currencies[money.identifier].to_btc(money.amount)
-        return Money(target, self.currencies[target].from_btc(btc.amount))
+        return Money(target, self.currencies[target].from_btc(btc))
 
 class Money(object):
     def __init__(self, identifier, amount, *args, **kwargs):
