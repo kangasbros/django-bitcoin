@@ -56,15 +56,15 @@ class Exchange(object):
                     "identifier": money.identifier, 
                     "currency_list": u", ".join(self.currencies.keys())})
 
-        if to not in self.currencies:
+        if target not in self.currencies:
             raise ConversionError(
                 "Unknown target currency %(identifier)s. "
                 "Available currencies: %(currency_list)s" % {
-                    "identifier": to, 
+                    "identifier": target, 
                     "currency_list": u", ".join(self.currencies.keys())})
 
         btc = self.currencies[money.identifier].to_btc(money.amount)
-        return Money(to, self.currencies[to].from_btc(money.amount))
+        return Money(target, self.currencies[target].from_btc(money.amount))
 
 class Money(object):
     def __init__(self, identifier, amount, *args, **kwargs):
