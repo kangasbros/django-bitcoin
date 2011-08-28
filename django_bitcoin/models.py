@@ -281,7 +281,7 @@ class Wallet(models.Model):
 
     def save(self, **kwargs):
         self.updated_at = datetime.datetime.now()
-        super(BitcoinWallet, self).save(**kwargs)
+        super(Wallet, self).save(**kwargs)
 
 ### Maybe in the future
 
