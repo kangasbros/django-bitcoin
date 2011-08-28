@@ -1,14 +1,14 @@
 from __future__ import with_statement
-from django.db import models
+
+import datetime
 import random
 import hashlib
 import base64
-from decimal import *
+from decimal import Decimal
+
+from django.db import models
 from django.contrib.sites.models import Site
 from django.conf import settings
-import datetime
-#from django
-
 from django.contrib.auth.models import User
 
 from django_bitcoin.utils import *
@@ -20,19 +20,30 @@ REUSE_ADDRESSES = getattr(settings, "BITCOIND_REUSE_ADDRESSES", True)
 ESCROW_PAYMENT_TIME_HOURS = getattr(settings, "BITCOIND_ESCROW_PAYMENT_TIME_HOURS", 4)
 ESCROW_RELEASE_TIME_DAYS = getattr(settings, "BITCOIND_ESCROW_RELEASE_TIME_DAYS", 14)
 
-currencies=((1, "USD"), (2, "EUR"), (3, "BTC"))
-confirmation_choices=((0, "0, (quick, recommended)"), (1, "1, (safer, slower for the buyer)"), 
-        (5, "5, (for the paranoid, not recommended)"))
+currencies=(
+    (1, "USD"), 
+    (2, "EUR"), 
+    (3, "BTC")
+)
+
+confirmation_choices=(
+    (0, "0, (quick, recommended)"), 
+    (1, "1, (safer, slower for the buyer)"), 
+    (5, "5, (for the paranoid, not recommended)")
+)
 
 
 class BitcoinTransaction(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
-    amount = models.DecimalField(max_digits=16, decimal_places=8, default=Decimal("0.0"))
+    amount = models.DecimalField(
+        max_digits=16, 
+        decimal_places=8, 
+        default=Decimal("0.0"))
     address = models.CharField(max_length=50)
 
 class BitcoinAddress(models.Model):
     address = models.CharField(max_length=50, blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(default=datetime.datetime.now)
     active = models.BooleanField(default=False)
 
     def received(self, minconf=2):
@@ -53,35 +64,36 @@ def new_bitcoin_address(amount):
     return bp
 
 class BitcoinPayment(models.Model):
-    """docstring"""
-    description = models.CharField(max_length=255, blank=True)
-    address = models.CharField(max_length=50)
-    amount = models.DecimalField(max_digits=16, decimal_places=8, default=Decimal("0.0"))
-    amount_paid = models.DecimalField(max_digits=16, decimal_places=8, default=Decimal("0.0"))
+    description = models.CharField(
+        max_length=255, 
+        blank=True)
+    address = models.CharField(
+        max_length=50)
+    amount = models.DecimalField(
+        max_digits=16, 
+        decimal_places=8, 
+        default=Decimal("0.0"))
+    amount_paid = models.DecimalField(
+        max_digits=16, 
+        decimal_places=8, 
+        default=Decimal("0.0"))
     active = models.BooleanField(default=False)
 
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    created_at = models.DateTimeField(default=datetime.datetime.now)
+    updated_at = models.DateTimeField()
 
     paid_at = models.DateTimeField(null=True, default=None)
 
-    withdrawn_total = models.DecimalField(max_digits=16, decimal_places=8, default=Decimal("0.0"))
+    withdrawn_total = models.DecimalField(
+        max_digits=16, 
+        decimal_places=8, 
+        default=Decimal("0.0"))
 
     transactions = models.ManyToManyField(BitcoinTransaction)
-
-    # def __init__(self, amount, currency):
-    #     bp=BitcoinPayment.objects.filter(active=False)
-    #     if len(bp)<1:
-    #         RefillPaymentQueue()
-    #         bp=BitcoinPayment.objects.filter(active=False)
-    #     bp=bp[0]
-    #     bp.active=True
-    #     bp.amount=amount
-    #     bp.save()
-    #     return bp
     
     def calculate_amount(self, proportion):
-        return quantitize_bitcoin(Decimal((proportion/Decimal("100.0"))*self.amount))
+        return quantitize_bitcoin(
+            Decimal((proportion/Decimal("100.0"))*self.amount))
 
     def add_transaction(self, amount, address):
         self.withdrawn_total+=amount
@@ -91,6 +103,8 @@ class BitcoinPayment(models.Model):
         bctrans.save()
         self.transactions.add(bctrans)
         self.save()
+
+        return bctrans
     
     def withdraw_proportion(self, address, proportion):
         if proportion<=Decimal("0") or proportion>Decimal("100"):
@@ -114,8 +128,7 @@ class BitcoinPayment(models.Model):
             final_amount+=am
             bp.add_transaction(am, address)
         bitcoin_sendtoaddress(address, final_amount)
-        return True
-        
+        return True        
 
     def withdraw_amounts(self, addresses_shares):
         """hash address -> percentage (string -> Decimal)"""
@@ -193,23 +206,34 @@ class BitcoinPayment(models.Model):
         self.save()
         return True
     
-    #def save(self, force_insert=False, force_update=False):
-    #
+    def save(self, **kwargs):
+        self.updated_at = datetime.datetime.now()
+        return super(BitcoinPayment, self).save(**kwargs)
 
     @models.permalink
     def get_absolute_url(self):
-        return ('view_or_url_name')
+        return ('view_or_url_name',)
 
 class BitcoinWalletTransaction(models.Model):
-    created_at = models.DateTimeField(auto_now_add=True)
-    from_wallet = models.ForeignKey('BitcoinWallet', related_name="from_transactions")
-    to_wallet = models.ForeignKey('BitcoinWallet', null=True, related_name="to_transactions")
-    to_bitcoinaddress = models.CharField(max_length=50, blank=True)
-    amount = models.DecimalField(max_digits=16, decimal_places=8, default=Decimal("0.0"))
+    created_at = models.DateTimeField(default=datetime.datetime.now)
+    from_wallet = models.ForeignKey(
+        'BitcoinWallet', 
+        related_name="from_transactions")
+    to_wallet = models.ForeignKey(
+        'BitcoinWallet', 
+        null=True, 
+        related_name="to_transactions")
+    to_bitcoinaddress = models.CharField(
+        max_length=50, 
+        blank=True)
+    amount = models.DecimalField(
+        max_digits=16, 
+        decimal_places=8, 
+        default=Decimal("0.0"))
 
 class BitcoinWallet(models.Model):
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    created_at = models.DateTimeField(default=datetime.datetime.now)
+    updated_at = models.DateTimeField()
 
     addresses = models.ManyToManyField(BitcoinAddress)
 
@@ -256,7 +280,11 @@ class BitcoinWallet(models.Model):
         return (BitcoinWalletTransaction.objects.filter(from_wallet=self).sum(amount))
 
     def total_balance(self):
-        return self.total_received()-self.total_sent()
+        return self.total_received() - self.total_sent()
+
+    def save(self, **kwargs):
+        self.updated_at = datetime.datetime.now()
+        super(BitcoinWallet, self).save(**kwargs)
 
 ### Maybe in the future
 
@@ -284,15 +312,17 @@ class BitcoinEscrow(models.Model):
     buyer_phone = models.CharField(max_length=20, blank=True)
     buyer_email = models.EmailField(max_length=75)
     
-    def save(self, force_insert=False, force_update=False):
-        super(BitcoinEscrow, self).save(force_insert=force_insert, force_update=force_update)
+    def save(self, **kwargs):
+        super(BitcoinEscrow, self).save(**kwargs)
         if not self.confirm_hash:
-            self.confirm_hash=generateuniquehash(length=32, extradata=str(self.id))
-            super(BitcoinEscrow, self).save(force_insert=force_insert, force_update=force_update)
+            self.confirm_hash=generateuniquehash(
+                length=32, 
+                extradata=str(self.id))
+            super(BitcoinEscrow, self).save(**kwargs)
     
     @models.permalink
     def get_absolute_url(self):
-        return ('view_or_url_name' )
+        return ('view_or_url_name',)
 
 def refill_payment_queue():
     c=BitcoinPayment.objects.filter(active=False).count()

@@ -1,30 +1,32 @@
 # vim: tabstop=4 expandtab autoindent shiftwidth=4 fileencoding=utf-8
 
-from django.conf import settings
-
-from django.core.cache import cache
-
-from django.db import transaction
-
-from decimal import *
-
 import json
-
 import jsonrpc
-
 import sys
-
 import urllib
-
 import urllib2
-
 import random
 import hashlib
 import base64
+from decimal import Decimal
 
-MAIN_ACCOUNT = getattr(settings, "BITCOIND_MAIN_ACCOUNT", "somerandomstring14aqqwd")
-CONNECTION_STRING = getattr(settings, "BITCOIND_CONNECTION_STRING", "")
-PAYMENT_BUFFER_SIZE = getattr(settings, "DBITCOIN_PAYMENT_BUFFER_SIZE", 5)
+from django.conf import settings
+from django.core.cache import cache
+from django.db import transaction
+
+
+MAIN_ACCOUNT = getattr(
+    settings, 
+    "BITCOIND_MAIN_ACCOUNT", 
+    "somerandomstring14aqqwd")
+CONNECTION_STRING = getattr(
+    settings, 
+    "BITCOIND_CONNECTION_STRING", 
+    "")
+PAYMENT_BUFFER_SIZE = getattr(
+    settings, 
+    "DBITCOIN_PAYMENT_BUFFER_SIZE",
+    5)
 
 bitcoind_access = jsonrpc.ServiceProxy(CONNECTION_STRING)
 
