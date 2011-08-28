@@ -166,10 +166,10 @@ class BitcoinChartsCurrency(Currency):
         return decimal.Decimal(factor)
 
     def to_btc(self, amount):
-        return amount / self.get_factor()
+        return amount * self.get_factor()
 
     def from_btc(self, amount):
-        return amount * self.get_factor()
+        return amount / self.get_factor()
 
 class EURCurrency(BitcoinChartsCurrency):
     identifier = "EUR"
