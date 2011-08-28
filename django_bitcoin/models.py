@@ -102,7 +102,7 @@ class Payment(models.Model):
         decimal_places=8, 
         default=Decimal("0.0"))
 
-    transactions = models.ManyToManyField(BitcoinTransaction)
+    transactions = models.ManyToManyField(Transaction)
     
     def calculate_amount(self, proportion):
         return quantitize_bitcoin(
