@@ -17,6 +17,7 @@ from django.core.cache import cache
 from django.db import transaction
 
 from django_bitcoin import settings
+from django_bitcoin import currency
 
 # BITCOIND COMMANDS
 
@@ -47,7 +48,6 @@ def bitcoin_getnewaddress(account_name=None):
                   DeprecationWarning)
     return bitcoind.create_address(account_name=account_name)
 
-
 def bitcoin_getbalance(address, minconf=1):
     warnings.warn("Use bitcoind.total_received(...) instead",
                   DeprecationWarning)
@@ -67,57 +67,19 @@ def bitcoin_sendtoaddress(address, amount):
 
 def bitcoinprice_usd():
     """return bitcoin price from any service we can get it"""
-    if cache.get('bitcoinprice'):
-        return cache.get('bitcoinprice')
-    # try first bitcoincharts
-    try:
-        f = urllib2.urlopen(u"http://bitcoincharts.com/t/weighted_prices.json")
-        result=f.read()
-        j=json.loads(result)
-        cache.set('bitcoinprice', j['USD'], 60*60)
-    except:
-        print "Unexpected error:", sys.exc_info()[0]
-        #raise
-
-    if not cache.get('bitcoinprice'):
-        if not cache.get('bitcoinprice_old'):
-            return {'24h': Decimal("13.4")}
-        cache.set('bitcoinprice', cache.get('bitcoinprice_old'), 60*60)
-
-    cache.set('bitcoinprice_old', cache.get('bitcoinprice'), 60*60*24*7)
-    return cache.get('bitcoinprice')
+    warnings.warn("Use django_bitcoin.currency.exchange.get_rate('USD')",
+                  DeprecationWarning)
+    return {"24h": currency.exchange.get_rate("USD")}
 
 def bitcoinprice_eur():
-    """return bitcoin price from any service we can get it"""
-    if cache.get('bitcoinprice_eur'):
-        return cache.get('bitcoinprice_eur')
-    # try first bitcoincharts
-    try:
-        f = urllib2.urlopen(u"http://bitcoincharts.com/t/weighted_prices.json")
-        result=f.read()
-        j=json.loads(result)
-        cache.set('bitcoinprice_eur', j['EUR'], 60*60)
-    except:
-        print "Unexpected error:", sys.exc_info()[0]
-        #raise
-
-    if not cache.get('bitcoinprice_eur'):
-        if not cache.get('bitcoinprice_eur_old'):
-            return {'24h': Decimal("10.0")}
-            #raise NameError('Not any currency data')
-        cache.set('bitcoinprice_eur', cache.get('bitcoinprice_eur_old'), 60*60)
-        cache.set('bitcoinprice_eur_old', cache.get('bitcoinprice_eur'), 60*60*24*7)
-
-    return cache.get('bitcoinprice')
+    warnings.warn("Use django_bitcoin.currency.exchange.get_rate('EUR')",
+                  DeprecationWarning)
+    return {"24h": currency.exchange.get_rate("EUR")}
 
 def bitcoinprice(currency):
-    if currency=="USD" or currency==1:
-        return Decimal(bitcoinprice_usd()['24h'])
-    elif currency=="EUR" or currency==2:
-        return Decimal(bitcoinprice_eur()['24h'])
-
-    raise NotImplementedError('This currency is not implemented')
-
+    warnings.warn("Use django_bitcoin.currency.exchange.get_rate(currency)",
+                  DeprecationWarning)
+    return currency.exchange.get_rate(currency)
 
 # generate a hash
 def generateuniquehash(length=43, extradata=''):

@@ -370,6 +370,17 @@ def new_bitcoin_payment_eur(amount):
 def getNewBitcoinPayment_eur(amount):
     return new_bitcoin_payment_eur(amount)
 
+# initialize the conversion module
+
+from django_bitcoin import currency
+
+from django.core import urlresolvers
+from django.utils import importlib
+
+for dottedpath in settings.BITCOIN_CURRENCIES:
+    klass = importlib.import_module(urlresolvers.get_mod_func(dottedpath))
+    currency.exchange.register_currency(klass())
+
 # EOF
 
 
