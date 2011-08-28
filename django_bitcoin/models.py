@@ -177,7 +177,7 @@ class Payment(models.Model):
     def withdraw_all(bitcoinpayments, addresses_shares):
         #if len(bitcoinpayments)!=len(addresses_shares):
         #    raise Exception("")
-        amounts_all=BitcoinPayment.calculate_amounts(bitcoinpayments, addresses_shares)
+        amounts_all=Payment.calculate_amounts(bitcoinpayments, addresses_shares)
         for i in range(0, len(bitcoinpayments)):
             bp=bitcoinpayments[i]
             am=bp.withdraw_amounts(addresses_shares)
@@ -221,7 +221,7 @@ class Payment(models.Model):
     
     def save(self, **kwargs):
         self.updated_at = datetime.datetime.now()
-        return super(BitcoinPayment, self).save(**kwargs)
+        return super(Payment, self).save(**kwargs)
 
     @models.permalink
     def get_absolute_url(self):
