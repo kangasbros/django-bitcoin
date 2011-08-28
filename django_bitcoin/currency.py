@@ -49,10 +49,10 @@ class Exchange(object):
     def register_currency(self, klass):
         self.currencies[klass.identifier] = klass
 
-    def get_rate(self, currency, to="BTC"):
+    def get_rate(self, currency, target="BTC"):
         """Rate is inferred from a dummy exchange"""
         start = Money(currency, "1.0")
-        end = self(start, to)
+        end = self(start, target)
         return end.amount
 
     def __call__(self, money, target="BTC"):
@@ -79,7 +79,7 @@ class Exchange(object):
                     "currency_list": u", ".join(self.currencies.keys())})
 
         btc = self.currencies[money.identifier].to_btc(money.amount)
-        return Money(target, self.currencies[target].from_btc(money.amount))
+        return Money(target, self.currencies[target].from_btc(btc.amount))
 
 class Money(object):
     def __init__(self, identifier, amount, *args, **kwargs):
