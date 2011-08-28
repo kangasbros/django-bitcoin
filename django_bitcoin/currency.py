@@ -107,6 +107,8 @@ class Currency(object):
         raise NotImplementedError
 
 class BTCCurrency(Currency):
+    identifier = "BTC"
+
     def to_btc(self, amount):
         return amount
 
