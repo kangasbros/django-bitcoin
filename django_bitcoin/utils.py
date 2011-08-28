@@ -9,6 +9,8 @@ import random
 import hashlib
 import base64
 from decimal import Decimal
+import decimal
+import warnings
 
 from django.conf import settings
 from django.core.cache import cache
@@ -16,31 +18,52 @@ from django.db import transaction
 
 from django_bitcoin import settings
 
-bitcoind_access = jsonrpc.ServiceProxy(settings.CONNECTION_STRING)
-
 # BITCOIND COMMANDS
 
 def quantitize_bitcoin(d):
     return d.quantize(Decimal("0.00000001"))
 
-def bitcoin_getnewaddress(account_name=settings.MAIN_ACCOUNT):
-    s=bitcoind_access.getnewaddress(account_name)
-    #print s
-    return s
+class BitcoindConnection(object):
+    def __init__(self, connection_string, main_account_name):
+        self.bitcoind_api = jsonrpc.ServiceProxy(connection_string)
+        self.account_name = main_account_name
+
+    def total_received(self, address, *args, **kwargs):
+        return decimal.Decimal(
+            self.bitcoind_api.getreceivedbyaddress(address, *args, **kwargs))
+    
+    def send(self, address, amount, *args, **kwargs):
+        self.bitcoind_api.sendtoaddress(address, float(amount), *args, **kwargs)
+
+    def create_address(self, for_account=None, *args, **kwargs):
+        return self.bitcoind_api.getnewaddress(
+            for_account or self.account_name, *args, **kwargs)
+
+bitcoind = BitcoindConnection(settings.CONNECTION_STRING,
+                              settings.MAIN_ACCOUNT)
+
+def bitcoin_getnewaddress(account_name=None):
+    warnings.warn("Use bitcoind.create_address(...) instead",    
+                  DeprecationWarning)
+    return bitcoind.create_address(account_name=account_name)
+
 
 def bitcoin_getbalance(address, minconf=1):
-    s=bitcoind_access.getreceivedbyaddress(address, minconf)
-    #print Decimal(s)
-    return Decimal(s)
+    warnings.warn("Use bitcoind.total_received(...) instead",
+                  DeprecationWarning)
+    return bitcoind.total_received(address, minconf)
 
 def bitcoin_getreceived(address, minconf=1):
-    s=bitcoind_access.getreceivedbyaddress(address, minconf)
-    #print Decimal(s)
-    return Decimal(s)
+    warnings.warn("Use bitcoind.total_received(...) instead",
+                  DeprecationWarning)
+    return bitcoind.total_received(address, minconf)
 
 def bitcoin_sendtoaddress(address, amount):
-    r=bitcoind_access.sendtoaddress(address, float(amount))
-    return True
+    warnings.warn("Use bitcoind.send(...) instead",
+                  DeprecationWarning)
+    return bitcoind.send(address, amount)
+
+# --------
 
 def bitcoinprice_usd():
     """return bitcoin price from any service we can get it"""

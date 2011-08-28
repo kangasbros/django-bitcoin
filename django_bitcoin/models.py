@@ -12,6 +12,7 @@ from django.conf import settings
 from django.contrib.auth.models import User
 
 from django_bitcoin.utils import *
+from django_bitcoin.utils import bitcoind
 from django_bitcoin import settings
 
 PAYMENT_VALID_HOURS = getattr(
@@ -52,7 +53,7 @@ confirmation_choices=(
 
 
 class Transaction(models.Model):
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(default=datetime.datetime.now)
     amount = models.DecimalField(
         max_digits=16, 
         decimal_places=8, 
@@ -65,7 +66,7 @@ class BitcoinAddress(models.Model):
     active = models.BooleanField(default=False)
 
     def received(self, minconf=2):
-        return Decimal(bitcoin_getreceived(self.address, minconf=minconf))
+        return bitcoind.total_received(self.address, minconf=minconf)
 
     def __unicode__(self):
         return self.address
@@ -114,12 +115,10 @@ class Payment(models.Model):
             Decimal((proportion/Decimal("100.0"))*self.amount))
 
     def add_transaction(self, amount, address):
-        self.withdrawn_total+=amount
-        bctrans=BitcoinTransaction()
-        bctrans.amount=amount
-        bctrans.address=address
-        bctrans.save()
-        self.transactions.add(bctrans)
+        self.withdrawn_total += amount
+        bctrans = self.transactions.create(
+            amount=amount,
+            address=address)
         self.save()
 
         return bctrans
@@ -134,7 +133,7 @@ class Payment(models.Model):
             raise Exception("Trying to withdraw too much.")
 
         self.add_transaction(amount, address)
-        bitcoin_sendtoaddress(address, amount)
+        bitcoind.send(address, amount)
 
     @classmethod
     def withdraw_proportion_all(cls, address, bitcoin_payments_proportions):
@@ -145,7 +144,7 @@ class Payment(models.Model):
             am=bp.calculate_amount(proportion)
             final_amount+=am
             bp.add_transaction(am, address)
-        bitcoin_sendtoaddress(address, final_amount)
+        bitcoind.send(address, final_amount)
         return True        
 
     def withdraw_amounts(self, addresses_shares):
@@ -170,30 +169,30 @@ class Payment(models.Model):
         return amounts
     
     @classmethod
-    def calculate_amounts(bitcoinpayments, addresses_shares):
-        amounts_all=[Decimal("0.0") for i in range(0, len(addresses_shares.keys()))]
-        for i in range(0, len(bitcoinpayments)):
-            bp=bitcoinpayments[i]
-            am=bp.withdraw_amounts(addresses_shares)
-            amounts_all=[(am[i]+amounts_all[i]) for i in range(0, len(addresses_shares.keys()))]
+    def calculate_amounts(cls, bitcoinpayments, addresses_shares):
+        amounts_all=[Decimal("0.0") for _i in addresses_shares]
+        for amount, payment in zip(amounts_all, bitcoinpayments):
+            withdrawn=payment.withdraw_amounts(addresses_shares)
+            amounts_all=[(w+total) for w, total in zip(withdrawn, amounts_all)]
         return amounts_all
 
     @classmethod
-    def withdraw_all(bitcoinpayments, addresses_shares):
+    def withdraw_all(cls, bitcoinpayments, addresses_shares):
         #if len(bitcoinpayments)!=len(addresses_shares):
         #    raise Exception("")
-        amounts_all=BitcoinPayment.calculate_amounts(bitcoinpayments, addresses_shares)
-        for i in range(0, len(bitcoinpayments)):
-            bp=bitcoinpayments[i]
+        amounts_all=Payment.calculate_amounts(bitcoinpayments, addresses_shares)
+        for bp in bitcoinpayments:
             am=bp.withdraw_amounts(addresses_shares)
             bp.withdraw_addresses=",".join(addresses_shares.keys())
-            bp.withdraw_proportions=",".join([str(x) for x in addresses_shares.values()])
-            bp.withdraw_amounts=",".join([str(x) for x in am])
+            bp.withdraw_proportions=",".join(
+                [str(x) for x in addresses_shares.values()])
+            bp.withdraw_amounts=",".join(
+                [str(x) for x in am])
             bp.withdrawn_at=datetime.datetime.now()
             bp.withdrawn_total=sum(am)
             bp.save()
-        for i in range(0, len(addresses_shares.keys())):
-            bitcoin_sendtoaddress(addresses_shares.keys()[i], amounts_all[i])
+        for i, share in enumerate(addresses_shares.keys()):
+            bitcoind.send(share, amounts_all[i])
         return True
 
     def is_paid(self, minconf=1):
@@ -203,7 +202,7 @@ class Payment(models.Model):
         return self.amount_paid>=self.amount
 
     def getbalance(self, minconf=1):
-        return Decimal(bitcoin_getbalance(self.address, minconf=minconf))
+        return bitcoind.total_received(self.address, minconf=minconf)
 
     def update_payment(self, minconf=1):
         new_amount=Decimal(bitcoin_getbalance(self.address, minconf=minconf))
@@ -254,7 +253,7 @@ class Wallet(models.Model):
     updated_at = models.DateTimeField()
 
     addresses = models.ManyToManyField(BitcoinAddress)
-    transactions = models.ManyToManyField(
+    transactions_with = models.ManyToManyField(
         'self',
         through=WalletTransaction,
         symmetrical=False)
@@ -289,7 +288,7 @@ class Wallet(models.Model):
             amount=amount,
             from_wallet=self,
             to_bitcoinaddress=address)
-        bitcoin_sendtoaddress(address, amount)
+        bitcoind.send(address, amount)
         return bwt
 
     def total_received(self):
@@ -351,13 +350,13 @@ def refill_payment_queue():
     if PAYMENT_BUFFER_SIZE>c:
         for i in range(0,settings.PAYMENT_BUFFER_SIZE-c):
             bp=Payment()
-            bp.address=bitcoin_getnewaddress()
+            bp.address=bitcoind.create_address()
             bp.save()
     c=BitcoinAddress.objects.filter(active=False).count()
     if PAYMENT_BUFFER_SIZE>c:
         for i in range(0,settings.PAYMENT_BUFFER_SIZE-c):
             ba=BitcoinAddress()
-            ba.address=bitcoin_getnewaddress()
+            ba.address=bitcoind.create_address()
             ba.save()
 
 def update_payments():
@@ -383,6 +382,8 @@ def new_bitcoin_payment(amount):
     return bp
 
 def getNewBitcoinPayment(amount):
+    warnings.warn("Use new_bitcoin_payment(amount) instead",
+                  DeprecationWarning)
     return new_bitcoin_payment(amount)
 
 @transaction.commit_on_success
