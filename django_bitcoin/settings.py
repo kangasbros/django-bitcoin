@@ -33,7 +33,7 @@ BITCOIN_CURRENCIES = getattr(
     settings, 
     "BITCOIN_CURRENCIES",
     [
-        "django_bitcoin.currency.BitcoinCurrency",
+        "django_bitcoin.currency.BTCCurrency",
         "django_bitcoin.currency.EURCurrency",
         "django_bitcoin.currency.USDCurrency"
         ])
