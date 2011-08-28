@@ -28,3 +28,12 @@ ESCROW_RELEASE_TIME_DAYS = getattr(
     settings, 
     "BITCOIND_ESCROW_RELEASE_TIME_DAYS", 
     14)
+
+BITCOIN_CURRENCIES = getattr(
+    settings, 
+    "BITCOIN_CURRENCIES",
+    [
+        "django_bitcoin.conversion.BitcoinCurrency",
+        "django_bitcoin.conversion.EURCurrency",
+        "django_bitcoin.conversion.USDCurrency"
+        ])
