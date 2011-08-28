@@ -81,6 +81,8 @@ def bitcoinprice(currency):
                   DeprecationWarning)
     return currency.exchange.get_rate(currency)
 
+# ------
+
 # generate a hash
 def generateuniquehash(length=43, extradata=''):
     r=str(random.random())

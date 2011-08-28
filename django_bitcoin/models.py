@@ -378,7 +378,8 @@ from django.core import urlresolvers
 from django.utils import importlib
 
 for dottedpath in settings.BITCOIN_CURRENCIES:
-    klass = importlib.import_module(urlresolvers.get_mod_func(dottedpath))
+    mod, func = urlresolvers.get_mod_func(dottedpath)
+    klass = getattr(importlib.import_module(mod), func)
     currency.exchange.register_currency(klass())
 
 # EOF
