@@ -14,28 +14,16 @@ from django.conf import settings
 from django.core.cache import cache
 from django.db import transaction
 
+from django_bitcoin import settings
 
-MAIN_ACCOUNT = getattr(
-    settings, 
-    "BITCOIND_MAIN_ACCOUNT", 
-    "somerandomstring14aqqwd")
-CONNECTION_STRING = getattr(
-    settings, 
-    "BITCOIND_CONNECTION_STRING", 
-    "")
-PAYMENT_BUFFER_SIZE = getattr(
-    settings, 
-    "DBITCOIN_PAYMENT_BUFFER_SIZE",
-    5)
-
-bitcoind_access = jsonrpc.ServiceProxy(CONNECTION_STRING)
+bitcoind_access = jsonrpc.ServiceProxy(settings.CONNECTION_STRING)
 
 # BITCOIND COMMANDS
 
 def quantitize_bitcoin(d):
     return d.quantize(Decimal("0.00000001"))
 
-def bitcoin_getnewaddress(account_name=MAIN_ACCOUNT):
+def bitcoin_getnewaddress(account_name=settings.MAIN_ACCOUNT):
     s=bitcoind_access.getnewaddress(account_name)
     #print s
     return s
@@ -142,4 +130,3 @@ def base642int(s):
     for c in s:
         n = n * BASE + ALPHABET_REVERSE[c]
     return n
-

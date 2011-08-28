@@ -12,13 +12,26 @@ from django.conf import settings
 from django.contrib.auth.models import User
 
 from django_bitcoin.utils import *
+from django_bitcoin import settings
 
-PAYMENT_VALID_HOURS = getattr(settings, "BITCOIND_PAYMENT_VALID_HOURS", 128)
+PAYMENT_VALID_HOURS = getattr(
+    settings, 
+    "BITCOIND_PAYMENT_VALID_HOURS", 
+    128)
 
-REUSE_ADDRESSES = getattr(settings, "BITCOIND_REUSE_ADDRESSES", True)
+REUSE_ADDRESSES = getattr(
+    settings, 
+    "BITCOIND_REUSE_ADDRESSES", 
+    True)
 
-ESCROW_PAYMENT_TIME_HOURS = getattr(settings, "BITCOIND_ESCROW_PAYMENT_TIME_HOURS", 4)
-ESCROW_RELEASE_TIME_DAYS = getattr(settings, "BITCOIND_ESCROW_RELEASE_TIME_DAYS", 14)
+ESCROW_PAYMENT_TIME_HOURS = getattr(
+    settings, 
+    "BITCOIND_ESCROW_PAYMENT_TIME_HOURS", 
+    4)
+ESCROW_RELEASE_TIME_DAYS = getattr(
+    settings, 
+    "BITCOIND_ESCROW_RELEASE_TIME_DAYS", 
+    14)
 
 currencies=(
     (1, "USD"), 
@@ -33,7 +46,7 @@ confirmation_choices=(
 )
 
 
-class BitcoinTransaction(models.Model):
+class Transaction(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     amount = models.DecimalField(
         max_digits=16, 
@@ -63,7 +76,7 @@ def new_bitcoin_address(amount):
     bp.save()
     return bp
 
-class BitcoinPayment(models.Model):
+class Payment(models.Model):
     description = models.CharField(
         max_length=255, 
         blank=True)
@@ -199,7 +212,7 @@ class BitcoinPayment(models.Model):
 
     def deactivate(self):
         return False
-        if self.amount_paid>Decimal(0):
+        if self.amount_paid > Decimal("0"):
             return False
         self.active=False
         self.description=""
@@ -214,15 +227,15 @@ class BitcoinPayment(models.Model):
     def get_absolute_url(self):
         return ('view_or_url_name',)
 
-class BitcoinWalletTransaction(models.Model):
+class WalletTransaction(models.Model):
     created_at = models.DateTimeField(default=datetime.datetime.now)
     from_wallet = models.ForeignKey(
-        'BitcoinWallet', 
-        related_name="from_transactions")
+        'Wallet', 
+        related_name="sent_transactions")
     to_wallet = models.ForeignKey(
-        'BitcoinWallet', 
+        'Wallet', 
         null=True, 
-        related_name="to_transactions")
+        related_name="received_transactions")
     to_bitcoinaddress = models.CharField(
         max_length=50, 
         blank=True)
@@ -231,14 +244,18 @@ class BitcoinWalletTransaction(models.Model):
         decimal_places=8, 
         default=Decimal("0.0"))
 
-class BitcoinWallet(models.Model):
+class Wallet(models.Model):
     created_at = models.DateTimeField(default=datetime.datetime.now)
     updated_at = models.DateTimeField()
 
     addresses = models.ManyToManyField(BitcoinAddress)
+    transactions = models.ManyToManyField(
+        'self',
+        through=WalletTransaction,
+        symmetric=False)
 
     def receiving_address(self):
-        if self.addresses.count>0:
+        if self.addresses.count():
             return self.addresses.all()[0].address
         self.addresses.add(new_bitcoin_address())
         self.save()
@@ -251,11 +268,11 @@ class BitcoinWallet(models.Model):
             raise Exception(_("Can't send to self-wallet"))
         if not otherWallet.id or not self.id:
             raise Exception(_("Some of the wallets not saved"))
-        bwt=BitcoinWalletTransaction()
-        bwt.amount=amount
-        bwt.from_wallet=self
-        bwt.to_wallet=otherWallet
-        bwt.save()
+        return WalletTransaction.objects.create(
+            amount=amount,
+            from_wallet=self,
+            to_wallet=otherWallet)
+
 
     def send_to_address(self, address, amount):
         if amount<self.total_balance():
@@ -264,20 +281,20 @@ class BitcoinWallet(models.Model):
             raise Exception(_("Can't send to self-wallet"))
         if not otherWallet.id or not self.id:
             raise Exception(_("Some of the wallets not saved"))
-        bwt=BitcoinWalletTransaction()
-        bwt.amount=amount
-        bwt.from_wallet=self
-        bwt.to_bitcoinaddress=address
-        bwt.save()
+        bwt = WalletTransaction.objects.create(
+            amount=amount,
+            from_wallet=self,
+            to_bitcoinaddress=address)
         bitcoin_sendtoaddress(address, amount)
+        return bwt
 
     def total_received(self):
         """docstring for getreceived"""
-        s=sum([a.received() for a in addresses])
-        return (s+BitcoinWalletTransaction.objects.filter(to_wallet=self).sum(amount))
+        s=sum([a.received() for a in self.addresses])
+        return (s+self.received_transactions.sum("amount"))
 
     def total_sent(self):
-        return (BitcoinWalletTransaction.objects.filter(from_wallet=self).sum(amount))
+        return self.sent_transactions.sum("amount")
 
     def total_balance(self):
         return self.total_received() - self.total_sent()
@@ -327,13 +344,13 @@ class BitcoinEscrow(models.Model):
 def refill_payment_queue():
     c=BitcoinPayment.objects.filter(active=False).count()
     if PAYMENT_BUFFER_SIZE>c:
-        for i in range(0,PAYMENT_BUFFER_SIZE-c):
+        for i in range(0,settings.PAYMENT_BUFFER_SIZE-c):
             bp=BitcoinPayment()
             bp.address=bitcoin_getnewaddress()
             bp.save()
     c=BitcoinAddress.objects.filter(active=False).count()
     if PAYMENT_BUFFER_SIZE>c:
-        for i in range(0,PAYMENT_BUFFER_SIZE-c):
+        for i in range(0,settings.PAYMENT_BUFFER_SIZE-c):
             ba=BitcoinAddress()
             ba.address=bitcoin_getnewaddress()
             ba.save()
