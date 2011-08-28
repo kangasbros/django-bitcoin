@@ -42,7 +42,7 @@ class BitcoinAddress(models.Model):
     active = models.BooleanField(default=False)
 
     def received(self, minconf=2):
-        return bitcoind.received(self.address, minconf=minconf)
+        return bitcoind.total_received(self.address, minconf=minconf)
 
     def __unicode__(self):
         return self.address
@@ -178,7 +178,7 @@ class Payment(models.Model):
         return self.amount_paid>=self.amount
 
     def getbalance(self, minconf=1):
-        return bitcoind.received(self.address, minconf=minconf)
+        return bitcoind.total_received(self.address, minconf=minconf)
 
     def update_payment(self, minconf=1):
         new_amount=Decimal(bitcoin_getbalance(self.address, minconf=minconf))
