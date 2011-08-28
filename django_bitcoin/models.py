@@ -252,7 +252,7 @@ class Wallet(models.Model):
     transactions = models.ManyToManyField(
         'self',
         through=WalletTransaction,
-        symmetric=False)
+        symmetrical=False)
 
     def receiving_address(self):
         if self.addresses.count():
