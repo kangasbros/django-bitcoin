@@ -71,9 +71,14 @@ class BitcoinAddress(models.Model):
     address = models.CharField(max_length=50, blank=True)
     created_at = models.DateTimeField(default=datetime.datetime.now)
     active = models.BooleanField(default=False)
+    least_received = models.DecimalField(max_digits=16, decimal_places=8, default=Decimal(0))
 
     def received(self, minconf=BITCOIN_MINIMUM_CONFIRMATIONS):
-        return bitcoind.total_received(self.address, minconf=minconf)
+        r=bitcoind.total_received(self.address, minconf=minconf)
+        if r>self.least_received:
+            self.least_received=r
+            self.save()
+        return r
 
     def __unicode__(self):
         return self.address
@@ -266,14 +271,15 @@ class Wallet(models.Model):
         symmetrical=False)
 
     def receiving_address(self):
-        if self.addresses.count():
-            return self.addresses.all()[0].address
-        self.addresses.add(new_bitcoin_address())
-        self.save()
-        return self.addresses.all()[0].address
+        usable_addresses=self.addresses.filter(active=True, least_received=Decimal(0))
+        if usable_addresses.count():
+            return usable_addresses[0].address
+        addr=new_bitcoin_address()
+        self.addresses.add(addr)
+        return addr.address
 
     def send_to_wallet(self, otherWallet, amount):
-        if amount<self.total_balance():
+        if amount>self.total_balance():
             raise Exception(_("Trying to send too much"))
         if self==otherWallet:
             raise Exception(_("Can't send to self-wallet"))
@@ -285,7 +291,7 @@ class Wallet(models.Model):
             to_wallet=otherWallet)
 
     def send_to_address(self, address, amount):
-        if amount<self.total_balance():
+        if amount>self.total_balance():
             raise Exception(_("Trying to send too much"))
         if self==otherWallet:
             raise Exception(_("Can't send to self-wallet"))

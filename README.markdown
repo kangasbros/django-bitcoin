@@ -3,11 +3,19 @@ INSTALLATION
 
 To install, just add the app to your settings.py INSTALLED_APPS like:
 
+```python
     INSTALLED_APPS = [
         ...
         'django_bitcoin',
         ...
     ]
+```
+
+Also you have to run a local bitcoind instance, and specify connection string in settings.
+
+```python
+BITCOIND_CONNECTION_STRING = "http://bitcoinuser:password@localhost:8332"
+```
 
 USAGE
 =====
@@ -16,6 +24,8 @@ You can use the `Wallet` class to do different bitcoin-moving applications. Typi
 
 Note that while you move bitcoins between Wallet-objects, only bitcoin transactions needed are incoming and outgoing transactions. 
 Transactions between the system don't generate "real" bitcoin transactions. Every transaction (except incoming transactions) is logged to "WalletTransaction" object to ease accounting.
+
+This also means that outgoing bitcoins are "mixed".
 
 ```python
 from django_bitcoin import Wallet, currency

@@ -1,0 +1,34 @@
+{% load i18n %}
+
+<table>
+    <tr>
+        <th>{% trans "date" %}</th>
+        <th>{% trans "type" %}</th>
+        <th>{% trans "amount" %}</th>
+    </tr>
+    {% for addr in wallet.addresses.all %}
+    <tr>
+        <td>{{ addr.created_at }}</td>
+        <td>{% trans "Bitoin deposit" %}</td>
+        <td>+{{ addr.received }}</td>
+    </tr>
+    {% endfor %}
+    {% for t in wallet.received_transactions.all %}
+    <tr>
+        <td>{{ t.created_at }}</td>
+        <td>{% trans "Wallet receive" %}</td>
+        <td>+{{ t.amount }}</td>
+    </tr>
+    {% endfor %}
+    {% for t in wallet.sent_transactions.all %}
+    <tr>
+        <td>{{ t.created_at }}</td>
+        <td>{% if t.to_wallet %}
+            {% trans "Wallet payment" %}
+            {% else %}
+            {% trans "Bitcoin withdrawal" %}
+        {% endif %}</td>
+    <td>-{{ t.amount }}</td>
+    </tr>
+    {% endfor %}
+</table>
