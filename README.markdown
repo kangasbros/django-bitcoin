@@ -4,11 +4,11 @@ INSTALLATION
 To install, just add the app to your settings.py INSTALLED_APPS like:
 
 ```python
-    INSTALLED_APPS = [
-        ...
-        'django_bitcoin',
-        ...
-    ]
+INSTALLED_APPS = [
+    ...
+    'django_bitcoin',
+    ...
+]
 ```
 
 Also you have to run a local bitcoind instance, and specify connection string in settings.
@@ -23,9 +23,9 @@ USAGE
 You can use the `Wallet` class to do different bitcoin-moving applications. Typical example would be a marketplace-style site, where there are multiple sellers and buyer. Or job freelance site, where escrow is needed. Or even an exchange could be done with this abstraction (a little extra classes would be needed however).
 
 Note that while you move bitcoins between Wallet-objects, only bitcoin transactions needed are incoming and outgoing transactions. 
-Transactions between the system don't generate "real" bitcoin transactions. Every transaction (except incoming transactions) is logged to "WalletTransaction" object to ease accounting.
+Transactions between the system don't generate "real" bitcoin transactions. Every transaction (except incoming transactions) is logged to `WalletTransaction` object to ease accounting.
 
-This also means that outgoing bitcoins are "mixed".
+This also means that outgoing bitcoin transactions are "mixed".
 
 ```python
 from django_bitcoin import Wallet, currency
@@ -64,9 +64,18 @@ if p1.wallet.total_balance()>=btc_amount:
         print "WHY U NO HAPPY"
         #return bitcoins to buyer, 50/50 split or something
 ```
-        
 
-Also there is older Payment -class, which can be used for simpler things (direct payments etc):
+To display transaction history and simple wallet tagline in your views, use the following templatetags:
+
+```django
+{% load currency_conversions %}
+<!-- display balance tagline, estimate in USD and received/sent -->
+{% wallet_tagline profile.bitcoin_wallet %}
+<!-- display list of transactions as a table -->
+{% wallet_history profile.bitcoin_wallet %} 
+```
+
+There is older Payment -class, which can be used for simpler things (direct payments etc):
 
 ```python
 from django_bitcoin import Payment, new_bitcoin_payment, bitcoinprice
