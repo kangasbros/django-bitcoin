@@ -8,18 +8,18 @@ tests_require = [
 ]
 
 setup(
-    name='django-ratings',
-    version=".".join(map(str, __import__('djangoratings').__version__)),
-    author='David Cramer',
-    author_email='dcramer@gmail.com',
-    description='Generic Ratings in Django',
-    url='http://github.com/dcramer/django-ratings',
+    name='django_bitcoin',
+    version=".".join(map(str, __import__('django_bitcoin').__version__)),
+    author='Jeremias Kangas',
+    author_email='jeremias.kangas@gmail.com',
+    description='BItcoin development for django',
+    url='http://github.com/kangasbros/django-bitcoin',
     install_requires=[
         'django',
     ],
     tests_require=tests_require,
-    extras_require={'test': tests_require},
-    test_suite='djangoratings.runtests.runtests',
+    #extras_require={'test': tests_require},
+    #test_suite='djangoratings.runtests.runtests',
     packages=find_packages(),
     include_package_data=True,
     classifiers=[
