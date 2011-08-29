@@ -12,7 +12,7 @@ To install, just add the app to your settings.py INSTALLED_APPS like:
 USAGE
 =====
 
-You can use the `Wallet` class to do different bitcoin-moving applications. Typical example would be a marketplace-style example. Or job freelance site, where escrow is needed.
+You can use the `Wallet` class to do different bitcoin-moving applications. Typical example would be a marketplace-style site, where there are multiple sellers and buyer. Or job freelance site, where escrow is needed. Or even an exchange could be done with this abstraction (a little extra classes would be needed however).
 
 Note that while you move bitcoins between Wallet-objects, only bitcoin transactions needed are incoming and outgoing transactions. 
 Transactions between the system don't generate "real" bitcoin transactions. Every transaction (except incoming transactions) is logged to "WalletTransaction" object to ease accounting.
