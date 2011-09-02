@@ -1,0 +1,11 @@
+{% load i18n %}
+<div>
+<center>
+    {% if description %}
+    {{ description }}<br/>
+    {% endif %}
+    <img src="https://chart.googleapis.com/chart?chs=250x250&cht=qr&chl=bitcoin:{{ address }}?amount={{ amount }}"/><br/>
+    {{ amount }} BTC {% if display_currency %}(~{{ currency_amount }} {{ display_currency }}){% endif %}
+            </center>
+        </div>
+
