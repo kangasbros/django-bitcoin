@@ -239,6 +239,9 @@ class Payment(models.Model):
         self.updated_at = datetime.datetime.now()
         return super(Payment, self).save(**kwargs)
 
+    def __unicode__(self):
+        return unicode(self.amount_paid)
+
     @models.permalink
     def get_absolute_url(self):
         return ('view_or_url_name',)
@@ -270,6 +273,9 @@ class Wallet(models.Model):
         through=WalletTransaction,
         symmetrical=False)
 
+    def __unicode__(self):
+        return u"%s: %s" % (self.id, unicode(self.created_at))
+
     def receiving_address(self):
         usable_addresses=self.addresses.filter(active=True, least_received=Decimal(0))
         if usable_addresses.count():
@@ -289,7 +295,6 @@ class Wallet(models.Model):
             amount=amount,
             from_wallet=self,
             to_wallet=otherWallet)
-
     def send_to_address(self, address, amount):
         if amount>self.total_balance():
             raise Exception(_("Trying to send too much"))
