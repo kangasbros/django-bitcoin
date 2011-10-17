@@ -1,32 +1,13 @@
-#!/usr/bin/env python
+from distutils.core import setup
 
-from setuptools import setup, find_packages
+setup(name='django-bitcoin',
+      version='1.0',
+      description='bitcoin payment management for django',
+      author='Jeremias Kangas',
+      url='https://github.com/kangasbros/django-bitcoin',
+      packages=['django_bitcoin', 
+                'django_bitcoin.management',
+                'django_bitcoin.management.commands',
+                'django_bitcoin.jsonrpc'],
+     )
 
-tests_require = [
-    'django',
-    # also requires the disqus fork of haystack
-]
-
-setup(
-    name='django_bitcoin',
-    version=".".join(map(str, __import__('django_bitcoin').__version__)),
-    author='Jeremias Kangas',
-    author_email='jeremias.kangas@gmail.com',
-    description='BItcoin development for django',
-    url='http://github.com/kangasbros/django-bitcoin',
-    install_requires=[
-        'django',
-    ],
-    tests_require=tests_require,
-    #extras_require={'test': tests_require},
-    #test_suite='djangoratings.runtests.runtests',
-    packages=find_packages(),
-    include_package_data=True,
-    classifiers=[
-        "Framework :: Django",
-        "Intended Audience :: Developers",
-        "Intended Audience :: System Administrators",
-        "Operating System :: OS Independent",
-        "Topic :: Software Development"
-    ],
-)

@@ -30,3 +30,15 @@ def wallet_history(wallet):
 @register.inclusion_tag('wallet_tagline.html')
 def wallet_tagline(wallet):
     return {'wallet': wallet, 'balance_usd': btc2usd(wallet.total_balance())}
+
+@register.inclusion_tag('bitcoin_payment_qr.html')
+def bitcoin_payment_qr(address, amount, description='', display_currency=''):
+    currency_amount=Decimal(0)
+    if display_currency:
+        currency_amount=(Decimal(amount)*currency.exchange.get_rate(display_currency)).quantize(Decimal("0.01"))
+    return {'address': address, 
+            'amount': amount, 
+            'description': description, 
+            'display_currency': display_currency,
+            'currency_amount': currency_amount,
+            }

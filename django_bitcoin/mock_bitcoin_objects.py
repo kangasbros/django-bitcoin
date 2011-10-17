@@ -15,6 +15,7 @@ from django_bitcoin import utils
 #def test_wallet_received():
 #    ...
 
+## FIRST
 mock_bitcoind = mock.Mock(wraps=utils.bitcoind, spec=utils.bitcoind)
 
 mock_received_123 = mock.Mock()
@@ -24,7 +25,25 @@ mock_bitcoind.total_received = mock.mocksignature(utils.bitcoind.total_received,
 
 mock_bitcoind.send = mock.mocksignature(utils.bitcoind.send)
 
-mock_bitcoind.create_address = mock.Mock(return_value='15EJtRsZAwwxtC4AiUS1ZsypGzk8WDLRFn')
+mock_bitcoind_address = mock.Mock()
+mock_bitcoind_address.return_value = '15EJtRsZAwwxtC4AiUS1ZsypGzk8WDLRFn'
+
+mock_bitcoind.create_address = mock.mocksignature(utils.bitcoind.create_address, mock=mock_bitcoind_address)
+
+## SECOND
+mock_bitcoind_other = mock.Mock(wraps=utils.bitcoind, spec=utils.bitcoind)
+
+mock_received_65535 = mock.Mock()
+mock_received_65535.return_value = decimal.Decimal(65535)
+
+mock_bitcoind_other.total_received = mock.mocksignature(utils.bitcoind.total_received, mock=mock_received_65535)
+
+mock_bitcoind_other.send = mock.mocksignature(utils.bitcoind.send)
+
+mock_bitcoind_other_address = mock.Mock()
+mock_bitcoind_other_address.return_value = '15EJtRsZAwwxtC4AiUS1ZsypGzk8WDLRFn'
+
+mock_bitcoind_other.create_address = mock.mocksignature(utils.bitcoind.create_address, mock=mock_bitcoind_other_address)
 
 # EOF
 
