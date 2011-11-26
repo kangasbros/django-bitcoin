@@ -145,9 +145,10 @@ class BitcoinChartsCurrency(Currency):
             j=json.loads(result)
             base_price = j[self.identifier]
             cache.set(self.cache_key, base_price, 60*60)
+            print result
         except:
             print "Unexpected error:", sys.exc_info()[0]
-            
+        
         if not cache.get(self.cache_key):
             if not cache.get(self.cache_key_old):
                 raise TemporaryConversionError(

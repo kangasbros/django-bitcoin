@@ -32,7 +32,7 @@ def wallet_tagline(wallet):
     return {'wallet': wallet, 'balance_usd': btc2usd(wallet.total_balance())}
 
 @register.inclusion_tag('bitcoin_payment_qr.html')
-def bitcoin_payment_qr(address, amount, description='', display_currency=''):
+def bitcoin_payment_qr(address, amount=Decimal("0"), description='', display_currency=''):
     currency_amount=Decimal(0)
     if display_currency:
         currency_amount=(Decimal(amount)*currency.exchange.get_rate(display_currency)).quantize(Decimal("0.01"))
