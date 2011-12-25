@@ -295,13 +295,10 @@ class Wallet(models.Model):
             amount=amount,
             from_wallet=self,
             to_wallet=otherWallet)
+    
     def send_to_address(self, address, amount):
         if amount>self.total_balance():
             raise Exception(_("Trying to send too much"))
-        if self==otherWallet:
-            raise Exception(_("Can't send to self-wallet"))
-        if not otherWallet.id or not self.id:
-            raise Exception(_("Some of the wallets not saved"))
         bwt = WalletTransaction.objects.create(
             amount=amount,
             from_wallet=self,
