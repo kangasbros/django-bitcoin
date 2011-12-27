@@ -276,13 +276,21 @@ class Wallet(models.Model):
     def __unicode__(self):
         return u"%s: %s" % (self.id, unicode(self.created_at))
 
-    def receiving_address(self):
-        usable_addresses=self.addresses.filter(active=True, least_received=Decimal(0))
+    def receiving_address(self, fresh_addr=True):
+        usable_addresses = self.addresses.filter(active=True)
+        if fresh_addr:
+            usable_addresses = usable_addresses.filter(least_received=Decimal(0))
         if usable_addresses.count():
             return usable_addresses[0].address
         addr=new_bitcoin_address()
         self.addresses.add(addr)
         return addr.address
+
+    def static_receiving_address(self):
+        '''
+        Returns a static receiving address for this Wallet object.
+        '''
+        return self.receiving_address(fresh_addr=False)
 
     def send_to_wallet(self, otherWallet, amount):
         if amount>self.total_balance():
