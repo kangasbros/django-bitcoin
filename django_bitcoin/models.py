@@ -277,10 +277,9 @@ class Wallet(models.Model):
         return u"%s: %s" % (self.id, unicode(self.created_at))
 
     def receiving_address(self, fresh_addr=True):
+        usable_addresses = self.addresses.filter(active=True).order_by("-id")
         if fresh_addr:
             usable_addresses = usable_addresses.filter(least_received=Decimal(0))
-        else:
-            usable_addresses = self.addresses.filter(active=True).order_by("-id")
         if usable_addresses.count():
             return usable_addresses[0].address
         addr=new_bitcoin_address()
@@ -306,13 +305,20 @@ class Wallet(models.Model):
             to_wallet=otherWallet)
     
     def send_to_address(self, address, amount):
+        if amount<Decimal(0):
+            raise Exception(_("Trying to send too much"))
         if amount>self.total_balance():
             raise Exception(_("Trying to send too much"))
         bwt = WalletTransaction.objects.create(
             amount=amount,
             from_wallet=self,
             to_bitcoinaddress=address)
-        bitcoind.send(address, amount)
+        result=bitcoind.send(address, amount)
+        #if result.startswith=="error":
+        #    bwt.delete()
+        #    raise Exception(_("bitcoind error: "+result['error']['message']))
+        #transaction=bitcoind.gettransaction(address, amount)
+        #if Decimal(transaction['fee'])<Decimal(0):
         return bwt
 
     def total_received(self):

@@ -39,11 +39,14 @@ class BitcoindConnection(object):
             self.bitcoind_api.getreceivedbyaddress(address, minconf))
     
     def send(self, address, amount, *args, **kwargs):
-        self.bitcoind_api.sendtoaddress(address, float(amount), *args, **kwargs)
+        return self.bitcoind_api.sendtoaddress(address, float(amount), *args, **kwargs)
 
     def create_address(self, for_account=None, *args, **kwargs):
         return self.bitcoind_api.getnewaddress(
             for_account or self.account_name, *args, **kwargs)
+    
+    def gettransaction(self, txid, *args, **kwargs):
+        return self.bitcoind_api.gettransaction(txid, *args, **kwargs)
 
 bitcoind = BitcoindConnection(settings.CONNECTION_STRING,
                               settings.MAIN_ACCOUNT)
