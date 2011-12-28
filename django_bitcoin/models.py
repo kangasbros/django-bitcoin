@@ -284,7 +284,7 @@ class Wallet(models.Model):
         return u"%s: %s" % (self.id, unicode(self.created_at))
 
     def receiving_address(self, fresh_addr=True):
-        usable_addresses = self.addresses.filter(active=True).order_by("-id")
+        usable_addresses = self.addresses.filter(active=True).order_by("id")
         if fresh_addr:
             usable_addresses = usable_addresses.filter(least_received=Decimal(0))
         if usable_addresses.count():
