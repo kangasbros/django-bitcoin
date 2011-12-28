@@ -46,6 +46,7 @@ class BitcoindConnection(object):
             for_account or self.account_name, *args, **kwargs)
     
     def gettransaction(self, txid, *args, **kwargs):
+        dir (self.bitcoind_api)
         return self.bitcoind_api.gettransaction(txid, *args, **kwargs)
 
 bitcoind = BitcoindConnection(settings.CONNECTION_STRING,

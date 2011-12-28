@@ -262,6 +262,13 @@ class WalletTransaction(models.Model):
         max_digits=16, 
         decimal_places=8, 
         default=Decimal("0.0"))
+    
+    def __unicode__(self):
+        if self.from_wallet and self.to_wallet:
+            return u"Wallet transaction "+unicode(self.amount)
+        elif self.from_wallet and self.to_bitcoinaddress:
+            return u"Outgoing bitcoin transaction "+unicode(self.amount)
+        return u"Fee "+unicode(self.amount)
 
 class Wallet(models.Model):
     created_at = models.DateTimeField(default=datetime.datetime.now)
@@ -305,20 +312,25 @@ class Wallet(models.Model):
             to_wallet=otherWallet)
     
     def send_to_address(self, address, amount):
-        if amount<Decimal(0):
+        if Decimal(amount)<Decimal(0):
             raise Exception(_("Trying to send too much"))
-        if amount>self.total_balance():
+        if Decimal(amount)>self.total_balance():
             raise Exception(_("Trying to send too much"))
         bwt = WalletTransaction.objects.create(
             amount=amount,
             from_wallet=self,
             to_bitcoinaddress=address)
-        result=bitcoind.send(address, amount)
-        #if result.startswith=="error":
-        #    bwt.delete()
-        #    raise Exception(_("bitcoind error: "+result['error']['message']))
-        #transaction=bitcoind.gettransaction(address, amount)
-        #if Decimal(transaction['fee'])<Decimal(0):
+        try:
+            result=bitcoind.send(address, amount)
+        except JSONRPCException:
+            bwt.delete()
+            raise
+        #print result
+        transaction=bitcoind.gettransaction(result)
+        if Decimal(transaction['fee'])<Decimal(0):
+            fee_transaction = WalletTransaction.objects.create(
+                amount=Decimal(transaction['fee'])*Decimal(-1),
+                from_wallet=self)
         return bwt
 
     def total_received(self):
