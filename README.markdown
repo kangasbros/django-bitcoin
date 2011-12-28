@@ -20,6 +20,10 @@ BITCOIND_CONNECTION_STRING = "http://bitcoinuser:password@localhost:8332"
 USAGE
 =====
 
+### Tutorial
+
+There is a small tutorial about how to use django-bitcoin to create your own instawallet: http://blog.kangasbros.fi/?p=85
+
 ### Wallet websites, escrow services using the "Wallet"-model
 
 You can use the `Wallet` class to do different bitcoin-moving applications. Typical example would be a marketplace-style site, where there are multiple sellers and buyer. Or job freelance site, where escrow is needed. Or even an exchange could be done with this abstraction (a little extra classes would be needed however).
