@@ -120,6 +120,15 @@ if bp.is_paid(minconf=5):
         Payment.withdraw_all(someaddress2,  {bp, bp2})
 ```
 
+USED AT
+=======
+
+Currently django-bitcoin is used at production in bountychest.com
+
+More to come!
+
+If you have a site using django-bitcoin, drop me an email and I will link to it here.
+
 NOTE
 ====
 

@@ -325,7 +325,9 @@ class Wallet(models.Model):
         except JSONRPCException:
             bwt.delete()
             raise
-        #print result
+        # check if a transaction fee exists, and deduct it from the wallet
+        # TODO: because fee can't be known beforehand, can reult in negative wallet balance.
+        # currently isn't muhc of a issue, but might be in the future, depending of the application
         transaction=bitcoind.gettransaction(result)
         if Decimal(transaction['fee'])<Decimal(0):
             fee_transaction = WalletTransaction.objects.create(

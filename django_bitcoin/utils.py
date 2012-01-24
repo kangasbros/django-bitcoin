@@ -1,5 +1,6 @@
 # vim: tabstop=4 expandtab autoindent shiftwidth=4 fileencoding=utf-8
 
+import os
 import json
 import jsonrpc
 import sys
@@ -92,9 +93,10 @@ def bitcoinprice(currency):
 
 # ------
 
-# generate a hash
+# generate a random hash
 def generateuniquehash(length=43, extradata=''):
-    r=str(random.random())
+    # cryptographically safe random
+    r=str(os.urandom(64))
     m = hashlib.sha256()
     m.update(r+str(extradata))
     key=m.digest()

@@ -145,14 +145,14 @@ class BitcoinChartsCurrency(Currency):
             j=json.loads(result)
             base_price = j[self.identifier]
             cache.set(self.cache_key, base_price, 60*60)
-            print result
+            #print result
         except:
             print "Unexpected error:", sys.exc_info()[0]
         
         if not cache.get(self.cache_key):
             if not cache.get(self.cache_key_old):
                 raise TemporaryConversionError(
-                    "Reliable exchange rate is not available for %s" % self.identifier)
+                    "Cache not enabled, reliable exchange rate is not available for %s" % self.identifier)
             cache.set(self.cache_key, cache.get(self.cache_key_old), 60*60)
 
         cache.set(self.cache_key_old, cache.get(self.cache_key), 60*60*24*7)
