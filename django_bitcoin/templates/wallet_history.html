@@ -5,13 +5,15 @@
         <th>{% trans "date" %}</th>
         <th>{% trans "type" %}</th>
         <th>{% trans "amount" %}</th>
+        <th>{% trans "description" %}</th>
     </tr>
     {% for addr in wallet.addresses.all %}
     {% if addr.received %}
     <tr>
         <td>{{ addr.created_at }}</td>
-        <td>{% trans "Bitoin deposit" %}</td>
+        <td>{% trans "Bitcoin deposit" %}</td>
         <td>+{{ addr.received }}</td>
+        <td></td>
     </tr>
     {% endif %}
     {% endfor %}
@@ -20,6 +22,7 @@
         <td>{{ t.created_at }}</td>
         <td>{% trans "Wallet receive" %}</td>
         <td>+{{ t.amount }}</td>
+        <td>{{ t.description }}</td>
     </tr>
     {% endfor %}
     {% for t in wallet.sent_transactions.all %}
@@ -36,6 +39,7 @@
             
         {% endif %}</td>
     <td>-{{ t.amount }}</td>
+    <td>{{ t.description }}</td>
     </tr>
     {% endfor %}
 </table>

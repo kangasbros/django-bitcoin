@@ -262,6 +262,7 @@ class WalletTransaction(models.Model):
         max_digits=16, 
         decimal_places=8, 
         default=Decimal("0.0"))
+    description = models.CharField(max_length=100, blank=True)
     
     def __unicode__(self):
         if self.from_wallet and self.to_wallet:
@@ -299,7 +300,7 @@ class Wallet(models.Model):
         '''
         return self.receiving_address(fresh_addr=False)
 
-    def send_to_wallet(self, otherWallet, amount):
+    def send_to_wallet(self, otherWallet, amount, description=''):
         if amount>self.total_balance():
             raise Exception(_("Trying to send too much"))
         if self==otherWallet:
@@ -309,7 +310,8 @@ class Wallet(models.Model):
         return WalletTransaction.objects.create(
             amount=amount,
             from_wallet=self,
-            to_wallet=otherWallet)
+            to_wallet=otherWallet,
+            description=description)
     
     def send_to_address(self, address, amount):
         if Decimal(amount)<Decimal(0):
