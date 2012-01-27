@@ -275,6 +275,7 @@ class Wallet(models.Model):
     created_at = models.DateTimeField(default=datetime.datetime.now)
     updated_at = models.DateTimeField()
 
+    label = models.CharField(max_length=50, blank=True)
     addresses = models.ManyToManyField(BitcoinAddress)
     transactions_with = models.ManyToManyField(
         'self',
@@ -282,7 +283,15 @@ class Wallet(models.Model):
         symmetrical=False)
 
     def __unicode__(self):
-        return u"%s: %s" % (self.id, unicode(self.created_at))
+        return u"%s: %s" % (self.label,
+                            self.created_at.strftime('%Y-%m-%d %H:%M'))
+
+    def save(self):
+        '''Assings a wallet label if the wallet doesn't have one.'''
+        super(Wallet, self).save(*args, **kwargs)
+        if not self.label:
+            self.label = 'Wallet #%d' % self.id
+            super(Wallet, self).save(*args, **kwargs) 
 
     def receiving_address(self, fresh_addr=True):
         usable_addresses = self.addresses.filter(active=True).order_by("id")
@@ -313,7 +322,7 @@ class Wallet(models.Model):
             to_wallet=otherWallet,
             description=description)
     
-    def send_to_address(self, address, amount):
+    def send_to_address(self, address, amount, description=''):
         if Decimal(amount)<Decimal(0):
             raise Exception(_("Trying to send too much"))
         if Decimal(amount)>self.total_balance():
@@ -321,7 +330,8 @@ class Wallet(models.Model):
         bwt = WalletTransaction.objects.create(
             amount=amount,
             from_wallet=self,
-            to_bitcoinaddress=address)
+            to_bitcoinaddress=address,
+            description=description)
         try:
             result=bitcoind.send(address, amount)
         except JSONRPCException:

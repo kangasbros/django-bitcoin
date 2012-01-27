@@ -27,6 +27,18 @@ def eur2btc(value):
 def wallet_history(wallet):
     return {'wallet': wallet}
 
+@register.filter
+def show_addr(address, arg):
+    '''
+    Display a bitcoin address with plus the link to its blockexplorer page.
+    '''
+    link ="<a href='http://blockexplorer.com/%s/'>%s</a>"
+    if arg == 'long':
+        return link % (address, address)
+    else:
+        return link % (address, address[:8])
+
+
 @register.inclusion_tag('wallet_tagline.html')
 def wallet_tagline(wallet):
     return {'wallet': wallet, 'balance_usd': btc2usd(wallet.total_balance())}
