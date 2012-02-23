@@ -4,7 +4,7 @@
 import re
 from django import forms
 from django.forms.util import ValidationError
-from Crypto.Hash import SHA256
+import hashlib
 
 class BCAddressField(forms.CharField):
     default_error_messages = {
@@ -93,7 +93,7 @@ def get_bcaddress_version(strAddress):
     version = addr[0]
     checksum = addr[-4:]
     vh160 = addr[:-4] # Version plus hash160 is what is checksummed                                                                                                                                                                                                        
-    h3=SHA256.new(SHA256.new(vh160).digest()).digest()
+    h3=hashlib.sha256(hashlib.sha256(vh160).digest()).digest()
     if h3[0:4] == checksum:
         return ord(version)
     return None
