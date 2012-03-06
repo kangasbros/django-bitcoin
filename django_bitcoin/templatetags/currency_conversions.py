@@ -3,6 +3,8 @@ from django_bitcoin import currency
 
 from decimal import Decimal
 
+from django.core.urlresolvers import reverse,  NoReverseMatch
+
 register = template.Library()
 
 # currency conversion functions
@@ -38,7 +40,6 @@ def show_addr(address, arg):
     else:
         return link % (address, address[:8])
 
-
 @register.inclusion_tag('wallet_tagline.html')
 def wallet_tagline(wallet):
     return {'wallet': wallet, 'balance_usd': btc2usd(wallet.total_balance())}
@@ -48,7 +49,14 @@ def bitcoin_payment_qr(address, amount=Decimal("0"), description='', display_cur
     currency_amount=Decimal(0)
     if display_currency:
         currency_amount=(Decimal(amount)*currency.exchange.get_rate(display_currency)).quantize(Decimal("0.01"))
+    try:
+        image_url = reverse('qrcode', args=('dummy',))
+    except NoReverseMatch,e:
+        raise ImproperlyConfigured('Make sure you\'ve included django_bitcoin.urls')
+    qr="bitcoin:"+address+("", "?amount="+str(amount))[amount>0]
+    address_qrcode = reverse('qrcode', args=(address,))
     return {'address': address, 
+            'address_qrcode': address_qrcode,
             'amount': amount, 
             'description': description, 
             'display_currency': display_currency,

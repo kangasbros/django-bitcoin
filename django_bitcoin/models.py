@@ -359,6 +359,15 @@ class Wallet(models.Model):
     def total_balance(self):
         return self.total_received() - self.total_sent()
 
+    def total_received_unconfirmed(self):
+        """docstring for getreceived"""
+        s=sum([a.received(minconf=0) for a in self.addresses.all()])
+        rt=self.received_transactions.aggregate(models.Sum("amount"))['amount__sum'] or Decimal(0)
+        return (s+rt)
+
+    def total_balance_unconfirmed(self):
+        return self.total_received_unconfirmed() - self.total_sent()
+
     def save(self, **kwargs):
         self.updated_at = datetime.datetime.now()
         super(Wallet, self).save(**kwargs)
