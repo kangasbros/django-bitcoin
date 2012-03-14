@@ -24,6 +24,10 @@ BITCOIN_MINIMUM_CONFIRMATIONS = getattr(
     settings, 
     "BITCOIN_MINIMUM_CONFIRMATIONS", 
     0)
+BITCOIN_TRANSACTION_CACHING = getattr(
+    settings, 
+    "BITCOIN_TRANSACTION_CACHING", 
+    False)
 
 # BITCOIND COMMANDS
 
@@ -36,8 +40,17 @@ class BitcoindConnection(object):
         self.account_name = main_account_name
 
     def total_received(self, address, minconf=BITCOIN_MINIMUM_CONFIRMATIONS):
+        if BITCOIN_TRANSACTION_CACHING:
+            cache_key=address+"_"+str(minconf)
+            cached = cache.get(cache_key)
+            if cached!=None:
+                return cached
+            cached=decimal.Decimal(
+                self.bitcoind_api.getreceivedbyaddress(address, minconf))
+            cache.set(cache_key, cached, 5)
+            return cached
         return decimal.Decimal(
-            self.bitcoind_api.getreceivedbyaddress(address, minconf))
+                self.bitcoind_api.getreceivedbyaddress(address, minconf))
     
     def send(self, address, amount, *args, **kwargs):
         return self.bitcoind_api.sendtoaddress(address, float(amount), *args, **kwargs)

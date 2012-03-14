@@ -4,13 +4,13 @@
     {% if description %}
     <b>{{ description }}</b><br/>
     {% endif %}
+    {{ address }}<br/>
     <img src="{{ address_qrcode }}"/>
     {% comment %}
     <img src="https://chart.googleapis.com/chart?chs=250x250&cht=qr&chl=bitcoin:{{ address }}{% if amount %}?amount={{ amount }}{% endif %}"/>
     {% endcomment %}
     <br/>
-    {% if amount %}{{ amount }} BTC {% if display_currency %}(~{{ currency_amount }} {{ display_currency }}){% endif %}<br/>{% endif %}
-    {{ address }}
+    {% if amount %}{{ amount }} BTC {% if display_currency %}(~{{ currency_amount }} {{ display_currency }}){% endif %}{% endif %}
     </center>
 </div>
 

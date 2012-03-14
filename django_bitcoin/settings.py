@@ -28,6 +28,14 @@ ESCROW_RELEASE_TIME_DAYS = getattr(
     settings, 
     "BITCOIND_ESCROW_RELEASE_TIME_DAYS", 
     14)
+BITCOIN_MINIMUM_CONFIRMATIONS = getattr(
+    settings, 
+    "BITCOIN_MINIMUM_CONFIRMATIONS", 
+    3)
+BITCOIN_TRANSACTION_CACHING = getattr(
+    settings, 
+    "BITCOIN_TRANSACTION_CACHING", 
+    False)
 
 BITCOIN_CURRENCIES = getattr(
     settings, 

@@ -338,14 +338,15 @@ class Wallet(models.Model):
             bwt.delete()
             raise
         # check if a transaction fee exists, and deduct it from the wallet
-        # TODO: because fee can't be known beforehand, can reult in negative wallet balance.
-        # currently isn't muhc of a issue, but might be in the future, depending of the application
+        # TODO: because fee can't be known beforehand, can result in negative wallet balance.
+        # currently isn't much of a issue, but might be in the future, depending of the application
         transaction=bitcoind.gettransaction(result)
+        fee_transaction=None
         if Decimal(transaction['fee'])<Decimal(0):
             fee_transaction = WalletTransaction.objects.create(
                 amount=Decimal(transaction['fee'])*Decimal(-1),
                 from_wallet=self)
-        return bwt
+        return (bwt, fee_transaction)
 
     def total_received(self):
         """docstring for getreceived"""
