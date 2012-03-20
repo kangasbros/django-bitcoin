@@ -8,9 +8,13 @@ CONNECTION_STRING = getattr(
     settings, 
     "BITCOIND_CONNECTION_STRING", 
     "")
-PAYMENT_BUFFER_SIZE = getattr(
+BITCOIN_PAYMENT_BUFFER_SIZE = getattr(
     settings, 
-    "DBITCOIN_PAYMENT_BUFFER_SIZE",
+    "BITCOIN_PAYMENT_BUFFER_SIZE",
+    5)
+BITCOIN_ADDRESS_BUFFER_SIZE = getattr(
+    settings, 
+    "BITCOIN_ADDRESS_BUFFER_SIZE", 
     5)
 PAYMENT_VALID_HOURS = getattr(
     settings, 

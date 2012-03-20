@@ -22,9 +22,14 @@ PAYMENT_VALID_HOURS = getattr(
     "BITCOIND_PAYMENT_VALID_HOURS", 
     128)
 
-PAYMENT_BUFFER_SIZE = getattr(
+BITCOIN_PAYMENT_BUFFER_SIZE = getattr(
     settings, 
-    "PAYMENT_BUFFER_SIZE", 
+    "BITCOIN_PAYMENT_BUFFER_SIZE", 
+    5)
+
+BITCOIN_ADDRESS_BUFFER_SIZE = getattr(
+    settings, 
+    "BITCOIN_ADDRESS_BUFFER_SIZE", 
     5)
 
 BITCOIN_MINIMUM_CONFIRMATIONS = getattr(
@@ -375,52 +380,52 @@ class Wallet(models.Model):
 
 ### Maybe in the future
 
-class FiatWalletTransaction(models.Model):
-    """Transaction for storing fiat currencies"""
-    pass
+# class FiatWalletTransaction(models.Model):
+#     """Transaction for storing fiat currencies"""
+#     pass
 
-class FiatWallet(models.Model):
-    """Wallet for storing fiat currencies"""
-    pass
+# class FiatWallet(models.Model):
+#     """Wallet for storing fiat currencies"""
+#     pass
 
-class BitcoinEscrow(models.Model):
-    """Bitcoin escrow payment"""
+# class BitcoinEscrow(models.Model):
+#     """Bitcoin escrow payment"""
     
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+#     created_at = models.DateTimeField(auto_now_add=True)
+#     updated_at = models.DateTimeField(auto_now=True)
 
-    seller = models.ForeignKey(User)
+#     seller = models.ForeignKey(User)
     
-    bitcoin_payment = models.ForeignKey(Payment)
+#     bitcoin_payment = models.ForeignKey(Payment)
 
-    confirm_hash = models.CharField(max_length=50, blank=True)
+#     confirm_hash = models.CharField(max_length=50, blank=True)
     
-    buyer_address = models.TextField()
-    buyer_phone = models.CharField(max_length=20, blank=True)
-    buyer_email = models.EmailField(max_length=75)
+#     buyer_address = models.TextField()
+#     buyer_phone = models.CharField(max_length=20, blank=True)
+#     buyer_email = models.EmailField(max_length=75)
     
-    def save(self, **kwargs):
-        super(BitcoinEscrow, self).save(**kwargs)
-        if not self.confirm_hash:
-            self.confirm_hash=generateuniquehash(
-                length=32, 
-                extradata=str(self.id))
-            super(BitcoinEscrow, self).save(**kwargs)
+#     def save(self, **kwargs):
+#         super(BitcoinEscrow, self).save(**kwargs)
+#         if not self.confirm_hash:
+#             self.confirm_hash=generateuniquehash(
+#                 length=32, 
+#                 extradata=str(self.id))
+#             super(BitcoinEscrow, self).save(**kwargs)
     
-    @models.permalink
-    def get_absolute_url(self):
-        return ('view_or_url_name',)
+#     @models.permalink
+#     def get_absolute_url(self):
+#         return ('view_or_url_name',)
 
 def refill_payment_queue():
     c=Payment.objects.filter(active=False).count()
-    if PAYMENT_BUFFER_SIZE>c:
-        for i in range(0,settings.PAYMENT_BUFFER_SIZE-c):
+    if BITCOIN_PAYMENT_BUFFER_SIZE>c:
+        for i in range(0,settings.BITCOIN_PAYMENT_BUFFER_SIZE-c):
             bp=Payment()
             bp.address=bitcoind.create_address()
             bp.save()
     c=BitcoinAddress.objects.filter(active=False).count()
-    if PAYMENT_BUFFER_SIZE>c:
-        for i in range(0,settings.PAYMENT_BUFFER_SIZE-c):
+    if BITCOIN_ADDRESS_BUFFER_SIZE>c:
+        for i in range(0,settings.BITCOIN_ADDRESS_BUFFER_SIZE-c):
             ba=BitcoinAddress()
             ba.address=bitcoind.create_address()
             ba.save()
