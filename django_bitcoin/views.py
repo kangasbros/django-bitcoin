@@ -8,7 +8,7 @@ def qrcode_view(request, key):
     cache_key="qrcode:"+key
     c=cache.get(cache_key)
     if not c:
-        img = qrcode.make(key, box_size=5)
+        img = qrcode.make(key, box_size=4)
         output = StringIO.StringIO()
         img.save(output, "PNG")
         c = output.getvalue()

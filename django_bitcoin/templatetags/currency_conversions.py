@@ -1,9 +1,12 @@
 from django import template
 from django_bitcoin import currency
 
+import json
 from decimal import Decimal
 
 from django.core.urlresolvers import reverse,  NoReverseMatch
+
+from django.template.defaultfilters import floatformat
 
 register = template.Library()
 
@@ -25,6 +28,34 @@ def btc2eur(value):
 def eur2btc(value):
     return (Decimal(value)/currency.exchange.get_rate('EUR')).quantize(Decimal("0.00000001"))
 
+@register.filter
+def btc2currency(value, other_currency="USD", rate_period="24h"):
+    if other_currency=="BTC":
+        return floatformat(value, -8)
+    return floatformat(currency.btc2currency(value, other_currency, rate_period), -2)
+
+@register.filter
+def currency2btc(value, other_currency="USD", rate_period="24h"):
+    if other_currency=="BTC":
+        return floatformat(value, -8)
+    return floatformat(currency.currency2btc(value, other_currency, rate_period), -2)
+
+@register.filter
+def currency2btc(value, other_currency="USD", rate_period="24h"):
+    if other_currency=="BTC":
+        return floatformat(value, -8)
+    return floatformat(currency.currency2btc(value, other_currency, rate_period), -2)
+
+@register.filter
+def currency2btc(value, other_currency="USD", rate_period="24h"):
+    if other_currency=="BTC":
+        return floatformat(value, -8)
+    return floatformat(currency.currency2btc(value, other_currency, rate_period), -2)
+
+@register.simple_tag
+def exchangerates_json():
+    return json.dumps(currency.get_rate_table())
+
 @register.inclusion_tag('wallet_history.html')
 def wallet_history(wallet):
     return {'wallet': wallet}
@@ -34,6 +65,7 @@ def show_addr(address, arg):
     '''
     Display a bitcoin address with plus the link to its blockexplorer page.
     '''
+    # note: i disapprove including somewhat unnecessary depencies such as this, especially since blockexplorer is  unreliable service
     link ="<a href='http://blockexplorer.com/%s/'>%s</a>"
     if arg == 'long':
         return link % (address, address)
