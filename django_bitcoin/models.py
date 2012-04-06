@@ -77,6 +77,7 @@ class BitcoinAddress(models.Model):
     created_at = models.DateTimeField(default=datetime.datetime.now)
     active = models.BooleanField(default=False)
     least_received = models.DecimalField(max_digits=16, decimal_places=8, default=Decimal(0))
+    label = models.CharField(max_length=50, blank=True, null=True, default=None)
 
     def received(self, minconf=BITCOIN_MINIMUM_CONFIRMATIONS):
         r=bitcoind.total_received(self.address, minconf=minconf)
@@ -86,6 +87,8 @@ class BitcoinAddress(models.Model):
         return r
 
     def __unicode__(self):
+        if self.label:
+            return u'%s (%s)' % (self.label, self.address)
         return self.address
 
 @transaction.commit_on_success
