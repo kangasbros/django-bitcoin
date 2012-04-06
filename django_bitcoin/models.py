@@ -8,7 +8,6 @@ from decimal import Decimal
 
 from django.db import models
 from django.contrib.sites.models import Site
-from django.conf import settings
 from django.contrib.auth.models import User
 
 from django_bitcoin.utils import *
@@ -16,40 +15,6 @@ from django_bitcoin.utils import bitcoind
 from django_bitcoin import settings
 
 from django.utils.translation import ugettext as _
-
-PAYMENT_VALID_HOURS = getattr(
-    settings, 
-    "BITCOIND_PAYMENT_VALID_HOURS", 
-    128)
-
-BITCOIN_PAYMENT_BUFFER_SIZE = getattr(
-    settings, 
-    "BITCOIN_PAYMENT_BUFFER_SIZE", 
-    5)
-
-BITCOIN_ADDRESS_BUFFER_SIZE = getattr(
-    settings, 
-    "BITCOIN_ADDRESS_BUFFER_SIZE", 
-    5)
-
-BITCOIN_MINIMUM_CONFIRMATIONS = getattr(
-    settings, 
-    "BITCOIN_MINIMUM_CONFIRMATIONS", 
-    0)
-
-REUSE_ADDRESSES = getattr(
-    settings, 
-    "BITCOIND_REUSE_ADDRESSES", 
-    True)
-
-ESCROW_PAYMENT_TIME_HOURS = getattr(
-    settings, 
-    "BITCOIND_ESCROW_PAYMENT_TIME_HOURS", 
-    4)
-ESCROW_RELEASE_TIME_DAYS = getattr(
-    settings, 
-    "BITCOIND_ESCROW_RELEASE_TIME_DAYS", 
-    14)
 
 currencies=(
     (1, "USD"), 
@@ -79,7 +44,7 @@ class BitcoinAddress(models.Model):
     least_received = models.DecimalField(max_digits=16, decimal_places=8, default=Decimal(0))
     label = models.CharField(max_length=50, blank=True, null=True, default=None)
 
-    def received(self, minconf=BITCOIN_MINIMUM_CONFIRMATIONS):
+    def received(self, minconf=settings.BITCOIN_MINIMUM_CONFIRMATIONS):
         r=bitcoind.total_received(self.address, minconf=minconf)
         if r>self.least_received:
             self.least_received=r
@@ -421,13 +386,13 @@ class Wallet(models.Model):
 
 def refill_payment_queue():
     c=Payment.objects.filter(active=False).count()
-    if BITCOIN_PAYMENT_BUFFER_SIZE>c:
+    if settings.BITCOIN_PAYMENT_BUFFER_SIZE>c:
         for i in range(0,settings.BITCOIN_PAYMENT_BUFFER_SIZE-c):
             bp=Payment()
             bp.address=bitcoind.create_address()
             bp.save()
     c=BitcoinAddress.objects.filter(active=False).count()
-    if BITCOIN_ADDRESS_BUFFER_SIZE>c:
+    if settings.BITCOIN_ADDRESS_BUFFER_SIZE>c:
         for i in range(0,settings.BITCOIN_ADDRESS_BUFFER_SIZE-c):
             ba=BitcoinAddress()
             ba.address=bitcoind.create_address()
