@@ -73,7 +73,7 @@ class Transaction(models.Model):
     address = models.CharField(max_length=50)
 
 class BitcoinAddress(models.Model):
-    address = models.CharField(max_length=50, blank=True)
+    address = models.CharField(max_length=50, unique=True)
     created_at = models.DateTimeField(default=datetime.datetime.now)
     active = models.BooleanField(default=False)
     least_received = models.DecimalField(max_digits=16, decimal_places=8, default=Decimal(0))
