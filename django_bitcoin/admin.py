@@ -18,7 +18,7 @@ class BitcoinAddressAdmin(admin.ModelAdmin):
     sync with the network
     """
 
-    list_display = ('address', 'created_at', 'least_received', 'active')
+    list_display = ('address', 'label', 'created_at', 'least_received', 'active')
     readonly_fields = ('address',)
 
 
@@ -42,23 +42,15 @@ class WalletAdmin(admin.ModelAdmin):
     """Admin ``Wallet``
     """
 
-    list_display = ('created_at', 'updated_at')
+    list_display = ('created_at', 'label', 'updated_at')
     readonly_fields = ('created_at', 'updated_at', 'addresses', 'transactions_with')
 
-
-class BitcoinEscrowAdmin(admin.ModelAdmin):
-    """For escrows
-    """
-
-    list_display = ('created_at', 'updated_at', 'seller', 'bitcoin_payment')
-    readonly_fields = ('created_at', 'updated_at', 'bitcoin_payment')
 
 admin.site.register(models.Transaction, TransactionAdmin)
 admin.site.register(models.BitcoinAddress, BitcoinAddressAdmin)
 admin.site.register(models.Payment, PaymentAdmin)
 admin.site.register(models.WalletTransaction, WalletTransactionAdmin)
 admin.site.register(models.Wallet, WalletAdmin)
-admin.site.register(models.BitcoinEscrow, BitcoinEscrowAdmin)
 
 # EOF
 
