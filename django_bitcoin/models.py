@@ -78,6 +78,9 @@ class BitcoinAddress(models.Model):
     active = models.BooleanField(default=False)
     least_received = models.DecimalField(max_digits=16, decimal_places=8, default=Decimal(0))
 
+    class Meta:
+        verbose_name_plural = 'Bitcoin addresses'
+
     def received(self, minconf=BITCOIN_MINIMUM_CONFIRMATIONS):
         r=bitcoind.total_received(self.address, minconf=minconf)
         if r>self.least_received:
