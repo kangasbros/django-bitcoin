@@ -47,7 +47,7 @@ class BitcoinAddress(models.Model):
     class Meta:
         verbose_name_plural = 'Bitcoin addresses'
 
-    def received(self, minconf=BITCOIN_MINIMUM_CONFIRMATIONS):
+    def received(self, minconf=settings.BITCOIN_MINIMUM_CONFIRMATIONS):
         r=bitcoind.total_received(self.address, minconf=minconf)
         if r>self.least_received:
             self.least_received=r
