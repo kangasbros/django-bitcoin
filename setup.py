@@ -1,7 +1,7 @@
 from distutils.core import setup
 
 setup(name='django-bitcoin',
-      version='1.0',
+      version='0.1',
       description='bitcoin payment management for django',
       author='Jeremias Kangas',
       url='https://github.com/kangasbros/django-bitcoin',
