@@ -16,6 +16,12 @@ from django_bitcoin import settings
 
 from django.utils.translation import ugettext as _
 
+import django.dispatch
+
+import jsonrpc
+
+balance_changed = django.dispatch.Signal(providing_args=["balance", "changed"])
+
 currencies=(
     (1, "USD"), 
     (2, "EUR"), 
@@ -27,7 +33,6 @@ confirmation_choices=(
     (1, "1, (safer, slower for the buyer)"), 
     (5, "5, (for the paranoid, not recommended)")
 )
-
 
 class Transaction(models.Model):
     created_at = models.DateTimeField(default=datetime.datetime.now)
@@ -42,6 +47,7 @@ class BitcoinAddress(models.Model):
     created_at = models.DateTimeField(default=datetime.datetime.now)
     active = models.BooleanField(default=False)
     least_received = models.DecimalField(max_digits=16, decimal_places=8, default=Decimal(0))
+    least_received_confirmed = models.DecimalField(max_digits=16, decimal_places=8, default=Decimal(0))
     label = models.CharField(max_length=50, blank=True, null=True, default=None)
 
     class Meta:
@@ -51,6 +57,9 @@ class BitcoinAddress(models.Model):
         r=bitcoind.total_received(self.address, minconf=minconf)
         if r>self.least_received:
             self.least_received=r
+            self.save()
+        if r>self.least_received_confirmed and minconf>=settings.BITCOIN_MINIMUM_CONFIRMATIONS:
+            self.least_received_confirmed=r
             self.save()
         return r
 
@@ -310,7 +319,7 @@ class Wallet(models.Model):
             description=description)
         try:
             result=bitcoind.send(address, amount)
-        except JSONRPCException:
+        except jsonrpc.JSONRPCException:
             bwt.delete()
             raise
         # check if a transaction fee exists, and deduct it from the wallet
