@@ -1,6 +1,6 @@
 {% load i18n %}
 {% load currency_conversions %}
-
+{% if wallet.has_history %}
 <table>
     <tr>
         <th>{% trans "Date" %}</th>
@@ -54,3 +54,4 @@
         </tr>
     {% endfor %}
 </table>
+{% endif %}

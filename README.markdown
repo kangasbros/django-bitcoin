@@ -103,6 +103,8 @@ The same but display also description and an estimate in EUR:
 {% bitcoin_payment_qr wallet.receiving_address bitcoin_amount "One beer" "EUR" %}.
 ```
 
+### Transaction notifications
+
 To enable bitcoin transaction notifications, set the following flag in your settings.py
 
 BITCOIN_TRANSACTION_SIGNALING = True
@@ -111,6 +113,25 @@ After that, you need to setup a cron job to run each minute, something like the 
 
 ```cron
 * * * * * (cd $APP_PATH && python manage.py python manage.py CheckTransactions >> $APP_PATH/logs/email_sends.log 2>&1)
+```
+
+After that you can define your balance_changed and balance_changed_confirmed signals:
+
+```python
+from django_bitcoin.models import balance_changed, balance_changed_confirmed
+from django.dispatch import receiver
+
+
+@receiver(balance_changed)
+def balance_changed_handler(sender, **kwargs):
+    pass
+    # try:
+    # print "balance changed", sender.id, kwargs["changed"], sender.total_balance()
+
+
+@receiver(balance_changed_confirmed)
+def balance_changed_confirmed_handler(sender, **kwargs):
+    pass
 ```
 
 ### obsolete
