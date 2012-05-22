@@ -20,19 +20,24 @@ import django.dispatch
 
 import jsonrpc
 
-balance_changed = django.dispatch.Signal(providing_args=["balance", "changed"])
+from BCAddressField import is_valid_btc_address
 
-currencies=(
-    (1, "USD"), 
-    (2, "EUR"), 
+
+balance_changed = django.dispatch.Signal(providing_args=["changed"])
+balance_changed_confirmed = django.dispatch.Signal(providing_args=["changed"])
+
+currencies = (
+    (1, "USD"),
+    (2, "EUR"),
     (3, "BTC")
 )
 
-confirmation_choices=(
+confirmation_choices = (
     (0, "0, (quick, recommended)"), 
     (1, "1, (safer, slower for the buyer)"), 
-    (5, "5, (for the paranoid, not recommended)")
+    (5, "5, (for the paranoid, not recommended)") 
 )
+
 
 class Transaction(models.Model):
     created_at = models.DateTimeField(default=datetime.datetime.now)
@@ -41,6 +46,7 @@ class Transaction(models.Model):
         decimal_places=8, 
         default=Decimal("0.0"))
     address = models.CharField(max_length=50)
+
 
 class BitcoinAddress(models.Model):
     address = models.CharField(max_length=50, unique=True)
@@ -53,15 +59,37 @@ class BitcoinAddress(models.Model):
     class Meta:
         verbose_name_plural = 'Bitcoin addresses'
 
-    def received(self, minconf=settings.BITCOIN_MINIMUM_CONFIRMATIONS):
-        r=bitcoind.total_received(self.address, minconf=minconf)
-        if r>self.least_received:
-            self.least_received=r
+    def query_bitcoind(self, minconf=settings.BITCOIN_MINIMUM_CONFIRMATIONS):
+        r = bitcoind.total_received(self.address, minconf=minconf)
+        if r > self.least_received:
+            if settings.BITCOIN_TRANSACTION_SIGNALING:
+                try:
+                    wallet = self.wallet_set.all()[0]
+                    balance_changed.send(sender=wallet, changed=(r - self.least_received))
+                except Wallet.DoesNotExist:
+                    pass
+            self.least_received = r
             self.save()
-        if r>self.least_received_confirmed and minconf>=settings.BITCOIN_MINIMUM_CONFIRMATIONS:
-            self.least_received_confirmed=r
+        if r > self.least_received_confirmed and \
+            minconf >= settings.BITCOIN_MINIMUM_CONFIRMATIONS:
+            if settings.BITCOIN_TRANSACTION_SIGNALING:
+                try:
+                    wallet = self.wallet_set.all()[0]
+                    balance_changed_confirmed.send(sender=wallet, 
+                        changed=(r - self.least_received_confirmed))
+                except Wallet.DoesNotExist:
+                    pass
+            self.least_received_confirmed = r
             self.save()
         return r
+
+    def received(self, minconf=settings.BITCOIN_MINIMUM_CONFIRMATIONS):
+        if settings.BITCOIN_TRANSACTION_SIGNALING:
+            if minconf >= settings.BITCOIN_MINIMUM_CONFIRMATIONS:
+                return self.least_received_confirmed
+            else:
+                return self.least_received
+        return self.query_bitcoind(minconf)
 
     def __unicode__(self):
         if self.label:
@@ -284,7 +312,7 @@ class Wallet(models.Model):
             usable_addresses = usable_addresses.filter(least_received=Decimal(0))
         if usable_addresses.count():
             return usable_addresses[0].address
-        addr=new_bitcoin_address()
+        addr = new_bitcoin_address()
         self.addresses.add(addr)
         return addr.address
 
@@ -295,22 +323,34 @@ class Wallet(models.Model):
         return self.receiving_address(fresh_addr=False)
 
     def send_to_wallet(self, otherWallet, amount, description=''):
-        if amount>self.total_balance():
+        if amount > self.total_balance():
             raise Exception(_("Trying to send too much"))
-        if self==otherWallet:
+        if self == otherWallet:
             raise Exception(_("Can't send to self-wallet"))
         if not otherWallet.id or not self.id:
             raise Exception(_("Some of the wallets not saved"))
+        if settings.BITCOIN_TRANSACTION_SIGNALING:
+            r = balance_changed.send(sender=self, 
+                changed=(Decimal(-1) * amount))
+            balance_changed.send(sender=otherWallet, 
+                changed=(amount))
+            balance_changed_confirmed.send(sender=self, 
+                changed=(Decimal(-1) * amount))
+            balance_changed_confirmed.send(sender=otherWallet, 
+                changed=(amount))
         return WalletTransaction.objects.create(
             amount=amount,
             from_wallet=self,
             to_wallet=otherWallet,
             description=description)
-    
+
+
     def send_to_address(self, address, amount, description=''):
-        if Decimal(amount)<Decimal(0):
-            raise Exception(_("Trying to send too much"))
-        if Decimal(amount)>self.total_balance():
+        if not is_valid_btc_address(str(address)):
+            raise Exception(_("Not a valid bitcoin address") + ":" + address)
+        if Decimal(amount) < Decimal(0):
+            raise Exception(_("Trying to send a negative amount"))
+        if Decimal(amount) > self.total_balance():
             raise Exception(_("Trying to send too much"))
         bwt = WalletTransaction.objects.create(
             amount=amount,
@@ -318,26 +358,33 @@ class Wallet(models.Model):
             to_bitcoinaddress=address,
             description=description)
         try:
-            result=bitcoind.send(address, amount)
+            result = bitcoind.send(address, amount)
         except jsonrpc.JSONRPCException:
             bwt.delete()
             raise
         # check if a transaction fee exists, and deduct it from the wallet
         # TODO: because fee can't be known beforehand, can result in negative wallet balance.
         # currently isn't much of a issue, but might be in the future, depending of the application
-        transaction=bitcoind.gettransaction(result)
-        fee_transaction=None
-        if Decimal(transaction['fee'])<Decimal(0):
+        transaction = bitcoind.gettransaction(result)
+        fee_transaction = None
+        total_amount = amount
+        if Decimal(transaction['fee']) < Decimal(0):
             fee_transaction = WalletTransaction.objects.create(
-                amount=Decimal(transaction['fee'])*Decimal(-1),
+                amount=Decimal(transaction['fee']) * Decimal(-1),
                 from_wallet=self)
+            total_amount += fee_transaction.amount
+        if settings.BITCOIN_TRANSACTION_SIGNALING:
+            balance_changed.send(sender=self, 
+                changed=(Decimal(-1) * total_amount))
+            balance_changed_confirmed.send(sender=self, 
+                changed=(Decimal(-1) * total_amount))
         return (bwt, fee_transaction)
 
     def total_received(self):
         """docstring for getreceived"""
-        s=sum([a.received() for a in self.addresses.all()])
-        rt=self.received_transactions.aggregate(models.Sum("amount"))['amount__sum'] or Decimal(0)
-        return (s+rt)
+        s = sum([a.received() for a in self.addresses.all()])
+        rt = self.received_transactions.aggregate(models.Sum("amount"))['amount__sum'] or Decimal(0)
+        return (s + rt)
 
     def total_sent(self):
         return self.sent_transactions.aggregate(models.Sum("amount"))['amount__sum'] or Decimal(0)

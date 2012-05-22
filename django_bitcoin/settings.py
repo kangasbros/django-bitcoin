@@ -40,6 +40,10 @@ BITCOIN_TRANSACTION_CACHING = getattr(
     settings, 
     "BITCOIN_TRANSACTION_CACHING", 
     False)
+BITCOIN_TRANSACTION_SIGNALING = getattr(
+    settings, 
+    "BITCOIN_TRANSACTION_SIGNALING", 
+    False)
 
 BITCOIN_CURRENCIES = getattr(
     settings, 
