@@ -306,7 +306,7 @@ class Wallet(models.Model):
             from_wallet=self,
             to_wallet=otherWallet,
             description=description)
-    
+
     def send_to_address(self, address, amount, description=''):
         if Decimal(amount)<Decimal(0):
             raise Exception(_("Trying to send too much"))
@@ -353,6 +353,16 @@ class Wallet(models.Model):
 
     def total_balance_unconfirmed(self):
         return self.total_received_unconfirmed() - self.total_sent()
+
+    def has_history(self):
+        """Returns True if this wallet was any transacion history"""
+        if self.received_transactions.all().count():
+            return True
+        if self.sent_transactions.all().count():
+            return True
+        if filter(lambda x: x.received(), self.addresses.all()):
+            return True
+        return False
 
     def save(self, **kwargs):
         self.updated_at = datetime.datetime.now()
