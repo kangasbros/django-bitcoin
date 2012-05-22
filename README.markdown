@@ -85,6 +85,8 @@ To display transaction history and simple wallet tagline in your views, use the 
 
 Easy way to convert currencies from each other: `btc2usd, usd2btc, eur2btc, btc2eur`
 
+Also currency2btc, btc2currency for any currencies on bitcoincharts.com
+
 ```django
 {% load currency_conversions %}
 Hi, for the pizza: send me {{bitcoin_amount}}BTC (about {{ bitcoin_amount|btc2usd }}USD).
@@ -99,6 +101,16 @@ Pay the following payment with your android bitcoin wallet:
 
 The same but display also description and an estimate in EUR:
 {% bitcoin_payment_qr wallet.receiving_address bitcoin_amount "One beer" "EUR" %}.
+```
+
+To enable bitcoin transaction notifications, set the following flag in your settings.py
+
+BITCOIN_TRANSACTION_SIGNALING = True
+
+After that, you need to setup a cron job to run each minute, something like the following:
+
+```cron
+* * * * * (cd $APP_PATH && python manage.py python manage.py CheckTransactions >> $APP_PATH/logs/email_sends.log 2>&1)
 ```
 
 ### obsolete
