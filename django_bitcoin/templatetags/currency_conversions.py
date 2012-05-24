@@ -6,11 +6,17 @@ from decimal import Decimal
 
 from django.core.urlresolvers import reverse,  NoReverseMatch
 
-from django.template.defaultfilters import floatformat
-
 register = template.Library()
 
 # currency conversion functions
+
+@register.filter
+def bitcoinformat(value):
+    return ("%.8f" % value).rstrip('0').rstrip('.')
+
+@register.filter
+def currencyformat(value):
+    return ("%.2f" % value)
 
 @register.filter
 def btc2usd(value):
@@ -31,26 +37,14 @@ def eur2btc(value):
 @register.filter
 def btc2currency(value, other_currency="USD", rate_period="24h"):
     if other_currency=="BTC":
-        return floatformat(value, -8)
-    return floatformat(currency.btc2currency(value, other_currency, rate_period), -2)
+        return bitcoinformat(value)
+    return currencyformat(currency.btc2currency(value, other_currency, rate_period))
 
 @register.filter
 def currency2btc(value, other_currency="USD", rate_period="24h"):
     if other_currency=="BTC":
-        return floatformat(value, -8)
-    return floatformat(currency.currency2btc(value, other_currency, rate_period), -2)
-
-@register.filter
-def currency2btc(value, other_currency="USD", rate_period="24h"):
-    if other_currency=="BTC":
-        return floatformat(value, -8)
-    return floatformat(currency.currency2btc(value, other_currency, rate_period), -2)
-
-@register.filter
-def currency2btc(value, other_currency="USD", rate_period="24h"):
-    if other_currency=="BTC":
-        return floatformat(value, -8)
-    return floatformat(currency.currency2btc(value, other_currency, rate_period), -2)
+        return currencyformat(value)
+    return bitcoinformat(currency.currency2btc(value, other_currency, rate_period))
 
 @register.simple_tag
 def exchangerates_json():

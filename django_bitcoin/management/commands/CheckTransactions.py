@@ -50,4 +50,4 @@ class Command(NoArgsCommand):
                 ba.query_bitcoind()
             if settings.DEBUG:
                 print "done, sleeping..."
-            sleep(2)
+            sleep(1)
