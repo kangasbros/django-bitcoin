@@ -36,7 +36,7 @@ class Command(NoArgsCommand):
                         ba.query_bitcoind(0)
             transactions = bitcoind.bitcoind_api.listtransactions()
             for t in transactions:
-                if not last_check_time or (int(t['time'])) >= last_check_time:
+                if t[u'category'] != u'immature' and (not last_check_time or (int(t['time'])) >= last_check_time):
                     try:
                         ba = BitcoinAddress.objects.get(address=t['address'])
                         if ba:
