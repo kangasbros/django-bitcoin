@@ -9,9 +9,9 @@ setup(name='django-bitcoin',
       packages=['django_bitcoin', 
                 'django_bitcoin.management',
                 'django_bitcoin.management.commands',
-                'django_bitcoin.management.templatetags',
-                'django_bitcoin.management.templates',
-                'django_bitcoin.management.migrations',
+                'django_bitcoin.templatetags',
+                'django_bitcoin.templates',
+                'django_bitcoin.migrations',
                 'django_bitcoin.jsonrpc'],
      )
 
