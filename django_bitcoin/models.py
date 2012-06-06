@@ -330,7 +330,7 @@ class Wallet(models.Model):
         if not otherWallet.id or not self.id:
             raise Exception(_("Some of the wallets not saved"))
         if settings.BITCOIN_TRANSACTION_SIGNALING:
-            r = balance_changed.send(sender=self, 
+            balance_changed.send(sender=self, 
                 changed=(Decimal(-1) * amount))
             balance_changed.send(sender=otherWallet, 
                 changed=(amount))

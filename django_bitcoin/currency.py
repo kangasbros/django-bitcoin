@@ -191,7 +191,6 @@ CURRENCY_CHOICES = (
     ('CAD', 'CAD'),
     ('CHF', 'CHF'),
     ('CNY', 'CNY'),
-    ('DKK', 'DKK'),
     ('GBP', 'GBP'),
     ('HKD', 'HKD'),
     ('JPY', 'JPY'),
