@@ -192,8 +192,6 @@ CURRENCY_CHOICES = (
     ('CHF', 'CHF'),
     ('CNY', 'CNY'),
     ('GBP', 'GBP'),
-    ('HKD', 'HKD'),
-    ('JPY', 'JPY'),
     ('NZD', 'NZD'),
     ('PLN', 'PLN'),
     ('RUB', 'RUB'),
