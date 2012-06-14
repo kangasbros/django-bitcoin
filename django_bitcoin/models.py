@@ -32,12 +32,15 @@ currencies = (
     (3, "BTC")
 )
 
+# XXX There *is* a risk when dealing with less then 6 confirmations. Check:
+# http://eprint.iacr.org/2012/248.pdf
+# http://blockchain.info/double-spends
+# for an informed decision.
 confirmation_choices = (
     (0, "0, (quick, recommended)"), 
     (1, "1, (safer, slower for the buyer)"), 
     (5, "5, (for the paranoid, not recommended)") 
 )
-
 
 class Transaction(models.Model):
     created_at = models.DateTimeField(default=datetime.datetime.now)
@@ -109,17 +112,17 @@ def new_bitcoin_address():
 
 class Payment(models.Model):
     description = models.CharField(
-        max_length=255, 
+        max_length=255,
         blank=True)
     address = models.CharField(
         max_length=50)
     amount = models.DecimalField(
-        max_digits=16, 
-        decimal_places=8, 
+        max_digits=16,
+        decimal_places=8,
         default=Decimal("0.0"))
     amount_paid = models.DecimalField(
-        max_digits=16, 
-        decimal_places=8, 
+        max_digits=16,
+        decimal_places=8,
         default=Decimal("0.0"))
     active = models.BooleanField(default=False)
 
@@ -129,12 +132,12 @@ class Payment(models.Model):
     paid_at = models.DateTimeField(null=True, default=None)
 
     withdrawn_total = models.DecimalField(
-        max_digits=16, 
-        decimal_places=8, 
+        max_digits=16,
+        decimal_places=8,
         default=Decimal("0.0"))
 
     transactions = models.ManyToManyField(Transaction)
-    
+
     def calculate_amount(self, proportion):
         return quantitize_bitcoin(
             Decimal((proportion/Decimal("100.0"))*self.amount))
@@ -147,7 +150,7 @@ class Payment(models.Model):
         self.save()
 
         return bctrans
-    
+
     def withdraw_proportion(self, address, proportion):
         if proportion<=Decimal("0") or proportion>Decimal("100"):
             raise Exception("Illegal proportion.")
@@ -170,7 +173,7 @@ class Payment(models.Model):
             final_amount+=am
             bp.add_transaction(am, address)
         bitcoind.send(address, final_amount)
-        return True        
+        return True
 
     def withdraw_amounts(self, addresses_shares):
         """hash address -> percentage (string -> Decimal)"""
@@ -192,7 +195,7 @@ class Payment(models.Model):
         if sum(amounts)>self.amount:
             raise Exception("Sum of calculated amounts exceeds funds.")
         return amounts
-    
+
     @classmethod
     def calculate_amounts(cls, bitcoinpayments, addresses_shares):
         amounts_all=[Decimal("0.0") for _i in addresses_shares]
@@ -247,7 +250,7 @@ class Payment(models.Model):
         self.description=""
         self.save()
         return True
-    
+
     def save(self, **kwargs):
         self.updated_at = datetime.datetime.now()
         return super(Payment, self).save(**kwargs)
@@ -262,27 +265,54 @@ class Payment(models.Model):
 class WalletTransaction(models.Model):
     created_at = models.DateTimeField(default=datetime.datetime.now)
     from_wallet = models.ForeignKey(
-        'Wallet', 
+        'Wallet',
         related_name="sent_transactions")
     to_wallet = models.ForeignKey(
-        'Wallet', 
-        null=True, 
+        'Wallet',
+        null=True,
         related_name="received_transactions")
     to_bitcoinaddress = models.CharField(
-        max_length=50, 
+        max_length=50,
         blank=True)
     amount = models.DecimalField(
-        max_digits=16, 
-        decimal_places=8, 
+        max_digits=16,
+        decimal_places=8,
         default=Decimal("0.0"))
     description = models.CharField(max_length=100, blank=True)
-    
+
     def __unicode__(self):
         if self.from_wallet and self.to_wallet:
             return u"Wallet transaction "+unicode(self.amount)
         elif self.from_wallet and self.to_bitcoinaddress:
             return u"Outgoing bitcoin transaction "+unicode(self.amount)
         return u"Fee "+unicode(self.amount)
+
+    def confirmation_status(self,
+                            minconf=settings.BITCOIN_MINIMUM_CONFIRMATIONS,
+                            transactions=None):
+        """
+        Returns the confirmed and unconfirmed parts of this transfer.
+        Also accepts and returns a list of transactions that are being
+        currently used.
+
+        The sum of the two amounts is the total transaction amount.
+        """
+
+        if not transactions: transactions = {}
+
+        if minconf == 0 or self.to_bitcoinaddress:
+            return (0, self.amount, transactions)
+
+        _, confirmed, txs = self.from_wallet.balance(minconf=minconf,
+                                             timeframe=self.created_at,
+                                             transactions=transactions)
+        transactions.update(txs)
+
+        if confirmed > self.amount: confirmed = self.amount
+        unconfirmed = self.amount - confirmed
+
+        return (unconfirmed, confirmed, transactions)
+
 
 class Wallet(models.Model):
     created_at = models.DateTimeField(default=datetime.datetime.now)
@@ -317,18 +347,28 @@ class Wallet(models.Model):
         return addr.address
 
     def static_receiving_address(self):
-        '''
-        Returns a static receiving address for this Wallet object.
-        '''
+        ''' Returns a static receiving address for this Wallet object.'''
         return self.receiving_address(fresh_addr=False)
 
     def send_to_wallet(self, otherWallet, amount, description=''):
-        if amount > self.total_balance():
+
+        if type(amount) != Decimal:
+            amount = Decimal(amount)
+        amount = amount.quantize(Decimal('0.00000001'))
+
+        if settings.BITCOIN_UNCONFIRMED_TRANSFERS:
+            avail = self.total_balance_unconfirmed()
+        else:
+            avail = self.total_balance()
+
+        if amount > avail:
             raise Exception(_("Trying to send too much"))
         if self == otherWallet:
             raise Exception(_("Can't send to self-wallet"))
         if not otherWallet.id or not self.id:
             raise Exception(_("Some of the wallets not saved"))
+        if amount <= 0:
+            raise Exception(_("Can't send zero or negative amounts"))
         if settings.BITCOIN_TRANSACTION_SIGNALING:
             balance_changed.send(sender=self, 
                 changed=(Decimal(-1) * amount))
@@ -344,13 +384,17 @@ class Wallet(models.Model):
             to_wallet=otherWallet,
             description=description)
 
-
     def send_to_address(self, address, amount, description=''):
+
+        if type(amount) != Decimal:
+            amount = Decimal(amount)
+        amount = amount.quantize(Decimal('0.00000001'))
+
         if not is_valid_btc_address(str(address)):
             raise Exception(_("Not a valid bitcoin address") + ":" + address)
-        if Decimal(amount) < Decimal(0):
-            raise Exception(_("Trying to send a negative amount"))
-        if Decimal(amount) > self.total_balance():
+        if amount <= 0:
+            raise Exception(_("Can't send zero or negative amounts"))
+        if amount > self.total_balance():
             raise Exception(_("Trying to send too much"))
         bwt = WalletTransaction.objects.create(
             amount=amount,
@@ -380,29 +424,117 @@ class Wallet(models.Model):
                 changed=(Decimal(-1) * total_amount))
         return (bwt, fee_transaction)
 
-    def total_received(self):
-        """docstring for getreceived"""
-        s = sum([a.received() for a in self.addresses.all()])
+    def update_transaction_cache(self,
+                                 mincf=settings.BITCOIN_MINIMUM_CONFIRMATIONS):
+        """
+        Finds the timestamp from the oldest transaction found with wasn't yet
+        confirmed. If none, returns the current timestamp.
+        """
+        if mincf == 0: return datetime.datetime.now()
+
+        transactions_checked = "bitcoin_transactions_checked_%d" % mincf
+        oldest_unconfirmed = "bitcoin_oldest_unconfirmed_%d" % mincf
+
+        if cache.get(transactions_checked):
+            return cache.get(oldest_unconfirmed)
+        else:
+            cache.set(transactions_checked, True, 60*15)
+            current_timestamp = datetime.datetime.now()
+            transactions = WalletTransaction.objects.all()
+            oldest = cache.get(oldest_unconfirmed)
+            if oldest:
+                transactions = transactions.filter(created_at__gte=oldest)
+
+            transactions_cache = {}
+            for t in transactions.order_by('created_at'):
+                unc, _, txs =  t.confirmation_status(minconf=mincf, transactions=transactions_cache)
+                transactions_cache.update(txs)
+                if unc:
+                    cache.set(oldest_unconfirmed, t.created_at)
+                    return t.created_at
+            cache.set(oldest_unconfirmed, current_timestamp)
+            return current_timestamp
+
+    def balance(self, minconf=settings.BITCOIN_MINIMUM_CONFIRMATIONS,
+                timeframe=None, transactions=None):
+        """
+        Returns a "greater or equal than minimum"  total ammount received at
+        this wallet with the given confirmations at the given timeframe.
+        """
+        if minconf == 0: return (0, self.total_received(0) - self.total_sent())
+
+        if not transactions: transactions = {}
+
+        if not timeframe:
+            oldest_unconfirmed = self.update_transaction_cache(minconf)
+        else:
+            oldest_unconfirmed = None
+
+        csum = sum([a.received(minconf=minconf) for a in self.addresses.all()])
+        usum = sum([a.received(minconf=0) for a in self.addresses.all()]) -csum
+
+        received = self.received_transactions.all()
+        sent = self.sent_transactions.all()
+        if timeframe:
+            received = received.filter(created_at__lt=timeframe)
+            sent = sent.filter(created_at__lt=timeframe)
+
+        def get_t(x):
+            if not (x.id,minconf) in transactions:
+                unc, conf, txs = x.confirmation_status(minconf,transactions)
+                transactions.update(txs)
+                transactions[(x.id, minconf)]= (unc, conf)
+            return transactions[(x.id,minconf)]
+
+        for t in received.order_by('created_at'):
+            if oldest_unconfirmed and t.created_at < oldest_unconfirmed:
+                csum += t.amount
+            else:
+                u,c = get_t(t)
+                usum += u
+                csum += c
+
+        for t in sent.order_by('created_at'):
+            if oldest_unconfirmed and t.created_at < oldest_unconfirmed:
+                csum -= t.amount
+            else:
+                u,c = get_t(t)
+                usum -= u
+                csum -= c
+
+        if not timeframe:
+            return (usum, csum) # return of a non recursive call
+        else:
+            return (usum, csum, transactions) # return of a recursive call
+
+    def total_balance(self, minconf=settings.BITCOIN_MINIMUM_CONFIRMATIONS):
+        """
+        Returns the total confirmed balance from the Wallet.
+        """
+        if not settings.BITCOIN_UNCONFIRMED_TRANSFERS:
+            return self.total_received(minconf) - self.total_sent()
+        else:
+            return self.balance(minconf)[1]
+
+    def total_balance_unconfirmed(self):
+        x = self.balance()
+        return x[0] + x[1]
+
+    def unconfirmed_balance(self):
+        return self.balance()[0]
+
+    def total_received(self, minconf=settings.BITCOIN_MINIMUM_CONFIRMATIONS):
+        """Returns the raw ammount ever received by this wallet."""
+        s = sum([a.received(minconf=minconf) for a in self.addresses.all()])
         rt = self.received_transactions.aggregate(models.Sum("amount"))['amount__sum'] or Decimal(0)
         return (s + rt)
 
     def total_sent(self):
+        """Returns the raw ammount ever sent by this wallet."""
         return self.sent_transactions.aggregate(models.Sum("amount"))['amount__sum'] or Decimal(0)
 
-    def total_balance(self):
-        return self.total_received() - self.total_sent()
-
-    def total_received_unconfirmed(self):
-        """docstring for getreceived"""
-        s=sum([a.received(minconf=0) for a in self.addresses.all()])
-        rt=self.received_transactions.aggregate(models.Sum("amount"))['amount__sum'] or Decimal(0)
-        return (s+rt)
-
-    def total_balance_unconfirmed(self):
-        return self.total_received_unconfirmed() - self.total_sent()
-
     def has_history(self):
-        """Returns True if this wallet was any transacion history"""
+        """Returns True if this wallet was any transacion history."""
         if self.received_transactions.all().count():
             return True
         if self.sent_transactions.all().count():
@@ -427,20 +559,20 @@ class Wallet(models.Model):
 
 # class BitcoinEscrow(models.Model):
 #     """Bitcoin escrow payment"""
-    
+
 #     created_at = models.DateTimeField(auto_now_add=True)
 #     updated_at = models.DateTimeField(auto_now=True)
 
 #     seller = models.ForeignKey(User)
-    
+
 #     bitcoin_payment = models.ForeignKey(Payment)
 
 #     confirm_hash = models.CharField(max_length=50, blank=True)
-    
+
 #     buyer_address = models.TextField()
 #     buyer_phone = models.CharField(max_length=20, blank=True)
 #     buyer_email = models.EmailField(max_length=75)
-    
+
 #     def save(self, **kwargs):
 #         super(BitcoinEscrow, self).save(**kwargs)
 #         if not self.confirm_hash:
@@ -448,7 +580,7 @@ class Wallet(models.Model):
 #                 length=32, 
 #                 extradata=str(self.id))
 #             super(BitcoinEscrow, self).save(**kwargs)
-    
+
 #     @models.permalink
 #     def get_absolute_url(self):
 #         return ('view_or_url_name',)
@@ -515,5 +647,3 @@ for dottedpath in settings.BITCOIN_CURRENCIES:
     currency.exchange.register_currency(klass())
 
 # EOF
-
-
