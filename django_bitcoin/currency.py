@@ -224,6 +224,29 @@ def get_rate_table():
         cache.set(cache_key_old, cache.get(cache_key), 60*60*24*7)
     return cache.get(cache_key)
 
+def currency_exchange_rates():
+    cache_key="currency_exchange_rates"
+    cache_key_old="currency_exchange_rates_old"
+    if not cache.get(cache_key):
+        try:
+            f = urllib2.urlopen(
+                u"http://openexchangerates.org/latest.json")
+            result=f.read()
+            j=json.loads(result)
+            cache.set(cache_key, j, 60*5)
+            #print result
+        except Exception, err:
+            print "Unexpected error:", sys.exc_info()[0], err
+
+        if not cache.get(cache_key):
+            if not cache.get(cache_key_old):
+                raise Exception(
+                    "Cache not enabled, reliable market data is not available")
+            cache.set(cache_key, cache.get(cache_key_old), 60*5)
+
+        cache.set(cache_key_old, cache.get(cache_key), 60*60*24*7)
+    return cache.get(cache_key)
+
 def currency_list():
     return get_rate_table().keys()
 
@@ -231,7 +254,10 @@ def get_currency_rate(currency="USD", rate_period="24h"):
     try:
         return Decimal(get_rate_table()[currency][rate_period])
     except KeyError:
-        return None
+        try:
+            return Decimal(currency_exchange_rates()['rates'][currency])*Decimal(get_rate_table()['USD'][rate_period])
+        except:
+            return None
 
 def btc2currency(amount, currency="USD", rate_period="24h"):
     rate=get_currency_rate(currency, rate_period)
