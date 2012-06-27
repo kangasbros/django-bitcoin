@@ -329,12 +329,11 @@ class Wallet(models.Model):
         return u"%s: %s" % (self.label,
                             self.created_at.strftime('%Y-%m-%d %H:%M'))
 
-    def save(self):
-        '''Assings a wallet label if the wallet doesn't have one.'''
+    def save(self, *args, **kwargs):
+        '''No need for labels.'''
+        self.updated_at = datetime.datetime.now()
         super(Wallet, self).save(*args, **kwargs)
-        if not self.label:
-            self.label = 'Wallet #%d' % self.id
-            super(Wallet, self).save(*args, **kwargs) 
+        #super(Wallet, self).save(*args, **kwargs) 
 
     def receiving_address(self, fresh_addr=True):
         usable_addresses = self.addresses.filter(active=True).order_by("id")
@@ -543,9 +542,9 @@ class Wallet(models.Model):
             return True
         return False
 
-    def save(self, **kwargs):
-        self.updated_at = datetime.datetime.now()
-        super(Wallet, self).save(**kwargs)
+    # def save(self, **kwargs):
+    #     self.updated_at = datetime.datetime.now()
+    #     super(Wallet, self).save(**kwargs)
 
 ### Maybe in the future
 
