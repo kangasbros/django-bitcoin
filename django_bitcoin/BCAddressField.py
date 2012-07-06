@@ -6,6 +6,7 @@ from django import forms
 from django.forms.util import ValidationError
 import hashlib
 
+
 class BCAddressField(forms.CharField):
     default_error_messages = {
         'invalid': 'Invalid Bitcoin address.',
@@ -15,6 +16,8 @@ class BCAddressField(forms.CharField):
         super(BCAddressField, self).__init__(*args, **kwargs)
 
     def clean(self, value):
+        if not value:
+            return None
         value = value.strip()
         if re.match(r"[a-zA-Z1-9]{27,35}$", value) is None:
             raise ValidationError(self.error_messages['invalid'])
@@ -22,6 +25,7 @@ class BCAddressField(forms.CharField):
         if version is None:
             raise ValidationError(self.error_messages['invalid'])
         return value
+
 
 def is_valid_btc_address(value):
     value = value.strip()
@@ -32,10 +36,10 @@ def is_valid_btc_address(value):
         return False
     return True
 
-import math
 
 __b58chars = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'
 __b58base = len(__b58chars)
+
 
 def b58encode(v):
     """ encode v, which is a string of bytes, to base58.                                                                                                                                                                                                                             
@@ -86,9 +90,10 @@ def b58decode(v, length):
 
     return result
 
+
 def get_bcaddress_version(strAddress):
     """ Returns None if strAddress is invalid.    Otherwise returns integer version of address. """
-    addr = b58decode(strAddress,25)
+    addr = b58decode(strAddress, 25)
     if addr is None: return None
     version = addr[0]
     checksum = addr[-4:]
