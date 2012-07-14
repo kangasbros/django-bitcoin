@@ -1,5 +1,13 @@
 from distutils.core import setup
 
+template_patterns = [
+    'templates/*.html',
+    'templates/*/*.html',
+    'templates/*/*/*.html',
+    ]
+
+package_name = 'django-bitcoin'
+
 setup(name='django-bitcoin',
       version='0.1',
       description='bitcoin payment management for django',
@@ -13,5 +21,7 @@ setup(name='django-bitcoin',
                 'django_bitcoin.templates',
                 'django_bitcoin.migrations',
                 'django_bitcoin.jsonrpc'],
+     package_data=dict( (package_name, template_patterns)
+                   for package_name in packages ),
      )
 
