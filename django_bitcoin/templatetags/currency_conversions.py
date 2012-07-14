@@ -84,7 +84,7 @@ def bitcoin_payment_qr(address, amount=Decimal("0"), description='', display_cur
     except NoReverseMatch,e:
         raise ImproperlyConfigured('Make sure you\'ve included django_bitcoin.urls')
     qr="bitcoin:"+address+("", "?amount="+str(amount))[amount>0]
-    address_qrcode = reverse('qrcode', args=(address,))
+    address_qrcode = reverse('qrcode', args=(qr,))
     return {'address': address, 
             'address_qrcode': address_qrcode,
             'amount': amount, 
