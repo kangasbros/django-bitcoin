@@ -7,6 +7,13 @@ template_patterns = [
     ]
 
 package_name = 'django-bitcoin'
+packages = ['django_bitcoin', 
+                'django_bitcoin.management',
+                'django_bitcoin.management.commands',
+                'django_bitcoin.templatetags',
+                'django_bitcoin.templates',
+                'django_bitcoin.migrations',
+                'django_bitcoin.jsonrpc']
 
 setup(name='django-bitcoin',
       version='0.1',
@@ -14,14 +21,8 @@ setup(name='django-bitcoin',
       author='Jeremias Kangas',
       url='https://github.com/kangasbros/django-bitcoin',
       requires=["qrcode (>2.3.1)", "South (>0.7.4)"],
-      packages=['django_bitcoin', 
-                'django_bitcoin.management',
-                'django_bitcoin.management.commands',
-                'django_bitcoin.templatetags',
-                'django_bitcoin.templates',
-                'django_bitcoin.migrations',
-                'django_bitcoin.jsonrpc'],
-     package_data=dict( (package_name, template_patterns)
-                   for package_name in packages ),
+      packages=packages,
+     package_data=dict((package_name, template_patterns)
+                   for package_name in packages),
      )
 
