@@ -250,6 +250,9 @@ def currency_exchange_rates():
 def currency_list():
     return get_rate_table().keys()
 
+def big_currency_list():
+    return sorted(["BTC"] + currency_exchange_rates()["rates"].keys())
+
 def get_currency_rate(currency="USD", rate_period="24h"):
     try:
         return Decimal(get_rate_table()[currency][rate_period])
