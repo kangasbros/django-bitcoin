@@ -16,11 +16,15 @@ register = template.Library()
 def bitcoinformat(value):
     if value == None:
         return None
+    if not isinstance(value, float):
+        return None
     return ("%.8f" % value).rstrip('0').rstrip('.')
 
 @register.filter
 def currencyformat(value):
     if value == None:
+        return None
+    if not isinstance(value, float):
         return None
     return ("%.2f" % value)
 
