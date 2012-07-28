@@ -516,15 +516,29 @@ class Wallet(models.Model):
             return self.balance(minconf)[1]
 
     def total_balance_unconfirmed(self):
-        x = self.balance()
-        return x[0] + x[1]
+        if not settings.BITCOIN_UNCONFIRMED_TRANSFERS:
+            return self.total_received(0) - self.total_sent()
+        else:
+            x = self.balance()
+            return x[0] + x[1]
 
     def unconfirmed_balance(self):
-        return self.balance()[0]
+        if not settings.BITCOIN_UNCONFIRMED_TRANSFERS:
+            return self.total_received(0) - self.total_sent()
+        else:
+            return self.balance()[0]
 
     def total_received(self, minconf=settings.BITCOIN_MINIMUM_CONFIRMATIONS):
         """Returns the raw ammount ever received by this wallet."""
-        s = sum([a.received(minconf=minconf) for a in self.addresses.all()])
+        if settings.BITCOIN_TRANSACTION_SIGNALING:
+            if minconf == settings.BITCOIN_MINIMUM_CONFIRMATIONS:
+                s = self.addresses.aggregate(models.Sum("least_received_confirmed"))['least_received_confirmed__sum'] or Decimal(0)
+            elif minconf == 0:
+                s = self.addresses.aggregate(models.Sum("least_received"))['least_received__sum'] or Decimal(0)
+            else:
+                s = sum([a.received(minconf=minconf) for a in self.addresses.all()])
+        else:
+            s = sum([a.received(minconf=minconf) for a in self.addresses.all()])
         rt = self.received_transactions.aggregate(models.Sum("amount"))['amount__sum'] or Decimal(0)
         return (s + rt)
 
