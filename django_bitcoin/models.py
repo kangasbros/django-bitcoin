@@ -26,6 +26,7 @@ from BCAddressField import is_valid_btc_address
 balance_changed = django.dispatch.Signal(providing_args=["changed"])
 balance_changed_confirmed = django.dispatch.Signal(providing_args=["changed"])
 
+
 currencies = (
     (1, "USD"),
     (2, "EUR"),
