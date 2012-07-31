@@ -23,8 +23,8 @@ import jsonrpc
 from BCAddressField import is_valid_btc_address
 
 
-balance_changed = django.dispatch.Signal(providing_args=["changed"])
-balance_changed_confirmed = django.dispatch.Signal(providing_args=["changed"])
+balance_changed = django.dispatch.Signal(providing_args=["changed", "transaction", "bitcoinaddress"])
+balance_changed_confirmed = django.dispatch.Signal(providing_args=["changed", "transaction", "bitcoinaddress"])
 
 
 currencies = (
@@ -69,7 +69,7 @@ class BitcoinAddress(models.Model):
             if settings.BITCOIN_TRANSACTION_SIGNALING:
                 try:
                     wallet = self.wallet_set.all()[0]
-                    balance_changed.send(sender=wallet, changed=(r - self.least_received))
+                    balance_changed.send(sender=wallet, changed=(r - self.least_received), bitcoinaddress=self)
                 except Wallet.DoesNotExist:
                     pass
             self.least_received = r
@@ -80,7 +80,7 @@ class BitcoinAddress(models.Model):
                 try:
                     wallet = self.wallet_set.all()[0]
                     balance_changed_confirmed.send(sender=wallet, 
-                        changed=(r - self.least_received_confirmed))
+                        changed=(r - self.least_received_confirmed), bitcoinaddress=self)
                 except Wallet.DoesNotExist:
                     pass
             self.least_received_confirmed = r
@@ -369,20 +369,21 @@ class Wallet(models.Model):
             raise Exception(_("Some of the wallets not saved"))
         if amount <= 0:
             raise Exception(_("Can't send zero or negative amounts"))
-        if settings.BITCOIN_TRANSACTION_SIGNALING:
-            balance_changed.send(sender=self, 
-                changed=(Decimal(-1) * amount))
-            balance_changed.send(sender=otherWallet, 
-                changed=(amount))
-            balance_changed_confirmed.send(sender=self, 
-                changed=(Decimal(-1) * amount))
-            balance_changed_confirmed.send(sender=otherWallet, 
-                changed=(amount))
-        return WalletTransaction.objects.create(
+        transaction = WalletTransaction.objects.create(
             amount=amount,
             from_wallet=self,
             to_wallet=otherWallet,
             description=description)
+        if settings.BITCOIN_TRANSACTION_SIGNALING:
+            balance_changed.send(sender=self, 
+                changed=(Decimal(-1) * amount), transaction=transaction)
+            balance_changed.send(sender=otherWallet, 
+                changed=(amount), transaction=transaction)
+            balance_changed_confirmed.send(sender=self, 
+                changed=(Decimal(-1) * amount), transaction=transaction)
+            balance_changed_confirmed.send(sender=otherWallet, 
+                changed=(amount), transaction=transaction)
+        return transaction
 
     def send_to_address(self, address, amount, description=''):
 
@@ -419,9 +420,9 @@ class Wallet(models.Model):
             total_amount += fee_transaction.amount
         if settings.BITCOIN_TRANSACTION_SIGNALING:
             balance_changed.send(sender=self, 
-                changed=(Decimal(-1) * total_amount))
+                changed=(Decimal(-1) * total_amount), transaction=bwt)
             balance_changed_confirmed.send(sender=self, 
-                changed=(Decimal(-1) * total_amount))
+                changed=(Decimal(-1) * total_amount), transaction=bwt)
         return (bwt, fee_transaction)
 
     def update_transaction_cache(self,
