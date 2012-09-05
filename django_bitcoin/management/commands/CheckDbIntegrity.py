@@ -30,6 +30,7 @@ class Command(NoArgsCommand):
         # 	print x.amount, x.created_at
         fee_sum = sum([x.amount for x in WalletTransaction.objects.filter(from_wallet__id__gt=0, to_wallet__isnull=True, to_bitcoinaddress="")])
         print "Fees, sum", fee_sum
+        print "DB balance", (bitcoinaddress_sum - transaction_out_sum - fee_sum)
         print "----"
         bitcoind_balance = bitcoind.bitcoind_api.getbalance()
         print "Bitcoind balance", bitcoind_balance
