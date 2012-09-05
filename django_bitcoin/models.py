@@ -69,22 +69,16 @@ class BitcoinAddress(models.Model):
         r = bitcoind.total_received(self.address, minconf=minconf)
         if r > self.least_received:
             if settings.BITCOIN_TRANSACTION_SIGNALING:
-                try:
-                    wallet = self.wallet_set.all()[0]
-                    balance_changed.send(sender=wallet, changed=(r - self.least_received), bitcoinaddress=self)
-                except Wallet.DoesNotExist:
-                    pass
+                if self.wallet:
+                    balance_changed.send(sender=self.wallet, changed=(r - self.least_received), bitcoinaddress=self)
             self.least_received = r
             self.save()
         if r > self.least_received_confirmed and \
             minconf >= settings.BITCOIN_MINIMUM_CONFIRMATIONS:
             if settings.BITCOIN_TRANSACTION_SIGNALING:
-                try:
-                    wallet = self.wallet_set.all()[0]
-                    balance_changed_confirmed.send(sender=wallet, 
+                if self.wallet:
+                    balance_changed_confirmed.send(sender=self.wallet, 
                         changed=(r - self.least_received_confirmed), bitcoinaddress=self)
-                except Wallet.DoesNotExist:
-                    pass
             self.least_received_confirmed = r
             self.save()
         return r
