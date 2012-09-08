@@ -25,7 +25,7 @@ class Command(NoArgsCommand):
             if settings.DEBUG:
                 print "starting..."
             if not last_check_time:
-                addresses_json = bitcoind.bitcoind_api.listreceivedbyaddress(0)
+                addresses_json = bitcoind.bitcoind_api.listreceivedbyaddress(0, True)
                 addresses = {}
                 for t in addresses_json:
                     addresses[t['address']] = Decimal(t['amount'])

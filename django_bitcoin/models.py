@@ -60,6 +60,8 @@ class BitcoinAddress(models.Model):
     least_received_confirmed = models.DecimalField(max_digits=16, decimal_places=8, default=Decimal(0))
     label = models.CharField(max_length=50, blank=True, null=True, default=None)
 
+    wallet = models.ForeignKey("Wallet", null=True, related_name="addresses")
+
     class Meta:
         verbose_name_plural = 'Bitcoin addresses'
 
@@ -67,22 +69,16 @@ class BitcoinAddress(models.Model):
         r = bitcoind.total_received(self.address, minconf=minconf)
         if r > self.least_received:
             if settings.BITCOIN_TRANSACTION_SIGNALING:
-                try:
-                    wallet = self.wallet_set.all()[0]
-                    balance_changed.send(sender=wallet, changed=(r - self.least_received), bitcoinaddress=self)
-                except Wallet.DoesNotExist:
-                    pass
+                if self.wallet:
+                    balance_changed.send(sender=self.wallet, changed=(r - self.least_received), bitcoinaddress=self)
             self.least_received = r
             self.save()
         if r > self.least_received_confirmed and \
             minconf >= settings.BITCOIN_MINIMUM_CONFIRMATIONS:
             if settings.BITCOIN_TRANSACTION_SIGNALING:
-                try:
-                    wallet = self.wallet_set.all()[0]
-                    balance_changed_confirmed.send(sender=wallet, 
+                if self.wallet:
+                    balance_changed_confirmed.send(sender=self.wallet, 
                         changed=(r - self.least_received_confirmed), bitcoinaddress=self)
-                except Wallet.DoesNotExist:
-                    pass
             self.least_received_confirmed = r
             self.save()
         return r
@@ -100,16 +96,18 @@ class BitcoinAddress(models.Model):
             return u'%s (%s)' % (self.label, self.address)
         return self.address
 
+
 @transaction.commit_on_success
 def new_bitcoin_address():
-    bp=BitcoinAddress.objects.filter(active=False)
+    bp=BitcoinAddress.objects.filter(active=False, wallet=None)
     if len(bp)<1:
         refill_payment_queue()
-        bp=BitcoinAddress.objects.filter(active=False)
+        bp=BitcoinAddress.objects.filter(active=False, wallet=None)
     bp=bp[0]
     bp.active=True
     bp.save()
     return bp
+
 
 class Payment(models.Model):
     description = models.CharField(
@@ -320,7 +318,8 @@ class Wallet(models.Model):
     updated_at = models.DateTimeField()
 
     label = models.CharField(max_length=50, blank=True)
-    addresses = models.ManyToManyField(BitcoinAddress)
+    # DEPRECATED: changed to foreign key
+    # addresses = models.ManyToManyField(BitcoinAddress, through="WalletBitcoinAddress")
     transactions_with = models.ManyToManyField(
         'self',
         through=WalletTransaction,
@@ -343,7 +342,8 @@ class Wallet(models.Model):
         if usable_addresses.count():
             return usable_addresses[0].address
         addr = new_bitcoin_address()
-        self.addresses.add(addr)
+        addr.wallet = self
+        addr.save()
         return addr.address
 
     def static_receiving_address(self):
@@ -386,6 +386,7 @@ class Wallet(models.Model):
         return transaction
 
     def send_to_address(self, address, amount, description=''):
+        address = address.strip()
 
         if type(amount) != Decimal:
             amount = Decimal(amount)
@@ -599,6 +600,7 @@ class Wallet(models.Model):
 #     @models.permalink
 #     def get_absolute_url(self):
 #         return ('view_or_url_name',)
+
 
 def refill_payment_queue():
     c=Payment.objects.filter(active=False).count()
