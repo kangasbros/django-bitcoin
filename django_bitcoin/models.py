@@ -559,6 +559,19 @@ class Wallet(models.Model):
             return True
         return False
 
+    def merge_wallet(self, other_wallet):
+        if self.id>0 and other_wallet.id>0:
+            from django.db import connection, transaction
+            cursor = connection.cursor()
+            cursor.execute("UPDATE django_bitcoin_bitcoinaddress SET wallet_id="+str(other_wallet.id)+\
+                " WHERE wallet_id="+str(self.id))
+            cursor.execute("UPDATE django_bitcoin_wallettransaction SET from_wallet_id="+str(other_wallet.id)+\
+                " WHERE from_wallet_id="+str(self.id))
+            cursor.execute("UPDATE django_bitcoin_wallettransaction SET to_wallet_id="+str(other_wallet.id)+\
+                " WHERE to_wallet_id="+str(self.id))
+            cursor.execute("DELETE FROM django_bitcoin_wallettransaction WHERE to_wallet_id=from_wallet_id")
+            transaction.commit_unless_managed()
+
     # def save(self, **kwargs):
     #     self.updated_at = datetime.datetime.now()
     #     super(Wallet, self).save(**kwargs)
