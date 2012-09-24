@@ -16,7 +16,7 @@ class BCAddressField(forms.CharField):
         super(BCAddressField, self).__init__(*args, **kwargs)
 
     def clean(self, value):
-        if not value:
+        if not value and not self.required:
             return None
         value = value.strip()
         if re.match(r"[a-zA-Z1-9]{27,35}$", value) is None:
