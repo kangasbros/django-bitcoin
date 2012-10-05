@@ -44,6 +44,10 @@ BITCOIN_TRANSACTION_SIGNALING = getattr(
     settings,
     "BITCOIN_TRANSACTION_SIGNALING",
     False)
+BITCOIN_DISABLE_OUTGOING = getattr(
+    settings,
+    "BITCOIN_DISABLE_OUTGOING",
+    False)
 BITCOIN_CURRENCIES = getattr(
     settings,
     "BITCOIN_CURRENCIES",

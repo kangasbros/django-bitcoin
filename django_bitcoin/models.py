@@ -386,6 +386,8 @@ class Wallet(models.Model):
         return transaction
 
     def send_to_address(self, address, amount, description=''):
+        if settings.BITCOIN_DISABLE_OUTGOING:
+            raise Exception("Outgoing transactions disabled! contact support.")
         address = address.strip()
 
         if type(amount) != Decimal:
