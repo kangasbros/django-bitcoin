@@ -22,6 +22,8 @@ import jsonrpc
 
 from BCAddressField import is_valid_btc_address
 
+from django.db import transaction as db_transaction
+
 
 balance_changed = django.dispatch.Signal(providing_args=["changed", "transaction", "bitcoinaddress"])
 balance_changed_confirmed = django.dispatch.Signal(providing_args=["changed", "transaction", "bitcoinaddress"])
@@ -313,7 +315,6 @@ class WalletTransaction(models.Model):
         return (unconfirmed, confirmed, transactions)
 
 from django.db.models import Q
-from django.db import transaction as db_transaction
 
 class Wallet(models.Model):
     created_at = models.DateTimeField(default=datetime.datetime.now)
@@ -328,7 +329,7 @@ class Wallet(models.Model):
         symmetrical=False)
 
     transaction_counter = models.IntegerField(default=1)
-    last_balance = models.DecimalField(default=Decimal(0), max_digits=5, decimal_places=2)
+    last_balance = models.DecimalField(default=Decimal(0), max_digits=16, decimal_places=8)
 
     def __unicode__(self):
         return u"%s: %s" % (self.label,
@@ -362,10 +363,9 @@ class Wallet(models.Model):
         amount = amount.quantize(Decimal('0.00000001'))
 
         with db_transaction.autocommit():
-            if settings.BITCOIN_UNCONFIRMED_TRANSFERS:
-                avail = self.total_balance_unconfirmed()
-            else:
-                avail = self.total_balance()
+            Wallet.objects.update()
+            avail = self.total_balance()
+            updated = Wallet.objects.filter(Q(id=self.id)).update(last_balance=avail)
 
             if self == otherWallet:
                 raise Exception(_("Can't send to self-wallet"))
@@ -378,7 +378,7 @@ class Wallet(models.Model):
             # concurrency check
             new_balance = avail - amount
             updated = Wallet.objects.filter(Q(id=self.id) & Q(transaction_counter=self.transaction_counter) & 
-                (Q(last_balance__gte=amount) | (Q(last_balance=0) & Q(transaction_counter=1))) )\
+                Q(last_balance=avail) )\
               .update(last_balance=new_balance, transaction_counter=self.transaction_counter+1)
             if not updated:
                 print "wallet transaction concurrency:", new_balance, avail, self.transaction_counter, self.last_balance, self.total_balance()
@@ -393,6 +393,8 @@ class Wallet(models.Model):
             # db_transaction.commit()
             self.transaction_counter = self.transaction_counter+1
             self.last_balance = new_balance
+            # updated = Wallet.objects.filter(Q(id=otherWallet.id))\
+            #   .update(last_balance=otherWallet.total_balance())
         
             if settings.BITCOIN_TRANSACTION_SIGNALING:
                 balance_changed.send(sender=self, 
@@ -421,11 +423,12 @@ class Wallet(models.Model):
         # concurrency check
         with db_transaction.autocommit():
             avail = self.total_balance()
+            updated = Wallet.objects.filter(Q(id=self.id)).update(last_balance=avail)
             if amount > avail:
                 raise Exception(_("Trying to send too much"))
             new_balance = avail - amount
             updated = Wallet.objects.filter(Q(id=self.id) & Q(transaction_counter=self.transaction_counter) & 
-                (Q(last_balance__gte=avail) | (Q(last_balance__gte=0) & Q(transaction_counter=1))) )\
+                Q(last_balance=avail) )\
               .update(last_balance=new_balance, transaction_counter=self.transaction_counter+1)
             if not updated:
                 print "address transaction concurrency:", new_balance, avail, self.transaction_counter, self.last_balance, self.total_balance()
@@ -550,6 +553,8 @@ class Wallet(models.Model):
         Returns the total confirmed balance from the Wallet.
         """
         if not settings.BITCOIN_UNCONFIRMED_TRANSFERS:
+            db_transaction.enter_transaction_management()
+            db_transaction.commit()
             return self.total_received(minconf) - self.total_sent()
         else:
             return self.balance(minconf)[1]
