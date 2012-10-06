@@ -425,7 +425,7 @@ class Wallet(models.Model):
                 raise Exception(_("Trying to send too much"))
             new_balance = avail - amount
             updated = Wallet.objects.filter(Q(id=self.id) & Q(transaction_counter=self.transaction_counter) & 
-                (Q(last_balance__gte=amount) | (Q(last_balance__gte=0) & Q(transaction_counter=1))) )\
+                (Q(last_balance__gte=avail) | (Q(last_balance__gte=0) & Q(transaction_counter=1))) )\
               .update(last_balance=new_balance, transaction_counter=self.transaction_counter+1)
             if not updated:
                 print "address transaction concurrency:", new_balance, avail, self.transaction_counter, self.last_balance, self.total_balance()

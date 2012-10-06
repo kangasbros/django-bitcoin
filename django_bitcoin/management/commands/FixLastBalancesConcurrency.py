@@ -12,11 +12,10 @@ class Command(NoArgsCommand):
 """
 
     def handle_noargs(self, **options):
-        if settings.DEBUG:
-            print "starting..."
-            for w in Wallet.objects.all():
-                w.last_balance = w.total_balance()
-                w.save()
+        print "starting..."
+        for w in Wallet.objects.all():
+            w.last_balance = w.total_balance()
+            w.save()
 
 
 
