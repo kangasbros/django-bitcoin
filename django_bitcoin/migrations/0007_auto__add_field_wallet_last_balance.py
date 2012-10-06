@@ -10,7 +10,7 @@ class Migration(SchemaMigration):
     def forwards(self, orm):
         # Adding field 'Wallet.last_balance'
         db.add_column('django_bitcoin_wallet', 'last_balance',
-                      self.gf('django.db.models.fields.DecimalField')(default='0', max_digits=5, decimal_places=2),
+                      self.gf('django.db.models.fields.DecimalField')(default='0', max_digits=16, decimal_places=8),
                       keep_default=False)
 
 
