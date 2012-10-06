@@ -377,10 +377,11 @@ class Wallet(models.Model):
                 raise Exception(_("Trying to send too much"))
             # concurrency check
             new_balance = avail - amount
-            updated = Wallet.objects.filter(Q(id=self.id) & Q(transaction_counter=self.transaction_counter) & Q(last_balance__gte=0))\
+            updated = Wallet.objects.filter(Q(id=self.id) & Q(transaction_counter=self.transaction_counter) & 
+                (Q(last_balance__gte=amount) | (Q(last_balance=0) & Q(transaction_counter=1))) )\
               .update(last_balance=new_balance, transaction_counter=self.transaction_counter+1)
             if not updated:
-                print "wallet transaction concurrency:", self.id, new_balance, avail, self.transaction_counter
+                print "wallet transaction concurrency:", new_balance, avail, self.transaction_counter, self.last_balance, self.total_balance()
                 raise Exception(_("Concurrency error with transactions. Please try again."))
             # db_transaction.commit()
             # concurrency check end
@@ -419,14 +420,15 @@ class Wallet(models.Model):
             raise Exception(_("Can't send zero or negative amounts"))
         # concurrency check
         with db_transaction.autocommit():
-            fetch_last_balance = self.total_balance()
-            if amount > fetch_last_balance:
+            avail = self.total_balance()
+            if amount > avail:
                 raise Exception(_("Trying to send too much"))
-            new_balance = fetch_last_balance - amount
-            updated = Wallet.objects.filter(Q(id=self.id) & Q(transaction_counter=self.transaction_counter) & Q(last_balance__gte=0))\
+            new_balance = avail - amount
+            updated = Wallet.objects.filter(Q(id=self.id) & Q(transaction_counter=self.transaction_counter) & 
+                (Q(last_balance__gte=amount) | (Q(last_balance__gte=0) & Q(transaction_counter=1))) )\
               .update(last_balance=new_balance, transaction_counter=self.transaction_counter+1)
             if not updated:
-                print "address transaction concurrency:", self.id, new_balance, fetch_last_balance, self.transaction_counter
+                print "address transaction concurrency:", new_balance, avail, self.transaction_counter, self.last_balance, self.total_balance()
                 raise Exception(_("Concurrency error with transactions. Please try again."))
             # concurrency check end
             bwt = WalletTransaction.objects.create(
