@@ -312,6 +312,7 @@ class WalletTransaction(models.Model):
 
         return (unconfirmed, confirmed, transactions)
 
+from django.db.models import Q
 
 class Wallet(models.Model):
     created_at = models.DateTimeField(default=datetime.datetime.now)
@@ -324,6 +325,9 @@ class Wallet(models.Model):
         'self',
         through=WalletTransaction,
         symmetrical=False)
+
+    transaction_counter = models.IntegerField(default=1)
+    last_balance = models.DecimalField(default=Decimal(0), max_digits=5, decimal_places=2)
 
     def __unicode__(self):
         return u"%s: %s" % (self.label,
@@ -361,14 +365,21 @@ class Wallet(models.Model):
         else:
             avail = self.total_balance()
 
-        if amount > avail:
-            raise Exception(_("Trying to send too much"))
         if self == otherWallet:
             raise Exception(_("Can't send to self-wallet"))
         if not otherWallet.id or not self.id:
             raise Exception(_("Some of the wallets not saved"))
         if amount <= 0:
             raise Exception(_("Can't send zero or negative amounts"))
+        if amount > avail:
+            raise Exception(_("Trying to send too much"))
+        # concurrency check
+        new_balance = avail - amount
+        updated = Wallet.objects.filter(Q(id=self.id) & Q(transaction_counter=self.transaction_counter) & Q(last_balance__gte=0))\
+          .update(last_balance=new_balance, transaction_counter=self.transaction_counter+1)
+        if not updated:
+            raise ConcurrentModificationException()
+        # concurrency check end
         transaction = WalletTransaction.objects.create(
             amount=amount,
             from_wallet=self,
@@ -398,8 +409,16 @@ class Wallet(models.Model):
             raise Exception(_("Not a valid bitcoin address") + ":" + address)
         if amount <= 0:
             raise Exception(_("Can't send zero or negative amounts"))
-        if amount > self.total_balance():
+        # concurrency check
+        fetch_last_balance = self.total_balance()
+        if amount > fetch_last_balance:
             raise Exception(_("Trying to send too much"))
+        new_balance = fetch_last_balance - amount
+        updated = Wallet.objects.filter(Q(id=self.id) & Q(transaction_counter=self.transaction_counter) & Q(last_balance__gte=0))\
+          .update(last_balance=new_balance, transaction_counter=self.transaction_counter+1)
+        if not updated:
+            raise Exception(_("Concurrency error with transactions. Please try again."))
+        # concurrency check end
         bwt = WalletTransaction.objects.create(
             amount=amount,
             from_wallet=self,
