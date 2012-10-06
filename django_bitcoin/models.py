@@ -380,7 +380,7 @@ class Wallet(models.Model):
             updated = Wallet.objects.filter(Q(id=self.id) & Q(transaction_counter=self.transaction_counter) & Q(last_balance__gte=0))\
               .update(last_balance=new_balance, transaction_counter=self.transaction_counter+1)
             if not updated:
-                print "wallet transaction concurrency:", new_balance, avail, self.transaction_counter
+                print "wallet transaction concurrency:", self.id, new_balance, avail, self.transaction_counter
                 raise Exception(_("Concurrency error with transactions. Please try again."))
             # db_transaction.commit()
             # concurrency check end
@@ -426,7 +426,7 @@ class Wallet(models.Model):
             updated = Wallet.objects.filter(Q(id=self.id) & Q(transaction_counter=self.transaction_counter) & Q(last_balance__gte=0))\
               .update(last_balance=new_balance, transaction_counter=self.transaction_counter+1)
             if not updated:
-                print "address transaction concurrency:", new_balance, fetch_last_balance, self.transaction_counter
+                print "address transaction concurrency:", self.id, new_balance, fetch_last_balance, self.transaction_counter
                 raise Exception(_("Concurrency error with transactions. Please try again."))
             # concurrency check end
             bwt = WalletTransaction.objects.create(
