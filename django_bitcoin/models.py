@@ -378,7 +378,7 @@ class Wallet(models.Model):
         updated = Wallet.objects.filter(Q(id=self.id) & Q(transaction_counter=self.transaction_counter) & Q(last_balance__gte=0))\
           .update(last_balance=new_balance, transaction_counter=self.transaction_counter+1)
         if not updated:
-            raise ConcurrentModificationException()
+            raise Exception(_("Concurrency error with transactions. Please try again."))
         # concurrency check end
         transaction = WalletTransaction.objects.create(
             amount=amount,
