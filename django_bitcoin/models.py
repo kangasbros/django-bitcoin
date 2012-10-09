@@ -363,7 +363,8 @@ class Wallet(models.Model):
         amount = amount.quantize(Decimal('0.00000001'))
 
         with db_transaction.autocommit():
-            Wallet.objects.update()
+            db_transaction.enter_transaction_management()
+            db_transaction.commit()
             avail = self.total_balance()
             updated = Wallet.objects.filter(Q(id=self.id)).update(last_balance=avail)
 
@@ -422,6 +423,8 @@ class Wallet(models.Model):
             raise Exception(_("Can't send zero or negative amounts"))
         # concurrency check
         with db_transaction.autocommit():
+            db_transaction.enter_transaction_management()
+            db_transaction.commit()
             avail = self.total_balance()
             updated = Wallet.objects.filter(Q(id=self.id)).update(last_balance=avail)
             if amount > avail:
@@ -553,8 +556,6 @@ class Wallet(models.Model):
         Returns the total confirmed balance from the Wallet.
         """
         if not settings.BITCOIN_UNCONFIRMED_TRANSFERS:
-            db_transaction.enter_transaction_management()
-            db_transaction.commit()
             return self.total_received(minconf) - self.total_sent()
         else:
             return self.balance(minconf)[1]
