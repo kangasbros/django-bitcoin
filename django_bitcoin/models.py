@@ -547,15 +547,31 @@ class Wallet(models.Model):
                 csum -= c
 
         if not timeframe:
-            return (usum, csum) # return of a non recursive call
+            return (usum, csum)  # return of a non recursive call
         else:
-            return (usum, csum, transactions) # return of a recursive call
+            return (usum, csum, transactions)  # return of a recursive call
+
+    def total_balance_sql(self, confirmed=True):
+        from django.db import connection, transaction
+        cursor = connection.cursor()
+        sql="""
+         SELECT IFNULL((SELECT SUM(%(confirmed)s) FROM django_bitcoin_bitcoinaddress ba WHERE ba.wallet_id=%(id)s), 0)
+        + IFNULL((SELECT SUM(amount) FROM django_bitcoin_wallettransaction wt WHERE wt.to_wallet_id=%(id)s), 0)
+        - IFNULL((SELECT SUM(amount) FROM django_bitcoin_wallettransaction wt WHERE wt.from_wallet_id=%(id)s), 0) as total_balance;
+        """ % {'confirmed': ("least_received", "least_received_confirmed")[confirmed], 'id': self.id}
+        cursor.execute(sql)
+        return cursor.fetchone()[0]
 
     def total_balance(self, minconf=settings.BITCOIN_MINIMUM_CONFIRMATIONS):
         """
         Returns the total confirmed balance from the Wallet.
         """
         if not settings.BITCOIN_UNCONFIRMED_TRANSFERS:
+            if settings.BITCOIN_TRANSACTION_SIGNALING:
+                if minconf == settings.BITCOIN_MINIMUM_CONFIRMATIONS:
+                    return self.total_balance_sql()
+                elif mincof == 0:
+                    self.total_balance_sql(False)
             return self.total_received(minconf) - self.total_sent()
         else:
             return self.balance(minconf)[1]
