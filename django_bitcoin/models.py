@@ -363,7 +363,8 @@ class Wallet(models.Model):
         amount = amount.quantize(Decimal('0.00000001'))
 
         with db_transaction.autocommit():
-            Wallet.objects.update()
+            db_transaction.enter_transaction_management()
+            db_transaction.commit()
             avail = self.total_balance()
             updated = Wallet.objects.filter(Q(id=self.id)).update(last_balance=avail)
 
@@ -422,6 +423,8 @@ class Wallet(models.Model):
             raise Exception(_("Can't send zero or negative amounts"))
         # concurrency check
         with db_transaction.autocommit():
+            db_transaction.enter_transaction_management()
+            db_transaction.commit()
             avail = self.total_balance()
             updated = Wallet.objects.filter(Q(id=self.id)).update(last_balance=avail)
             if amount > avail:
@@ -544,17 +547,31 @@ class Wallet(models.Model):
                 csum -= c
 
         if not timeframe:
-            return (usum, csum) # return of a non recursive call
+            return (usum, csum)  # return of a non recursive call
         else:
-            return (usum, csum, transactions) # return of a recursive call
+            return (usum, csum, transactions)  # return of a recursive call
+
+    def total_balance_sql(self, confirmed=True):
+        from django.db import connection, transaction
+        cursor = connection.cursor()
+        sql="""
+         SELECT IFNULL((SELECT SUM(%(confirmed)s) FROM django_bitcoin_bitcoinaddress ba WHERE ba.wallet_id=%(id)s), 0)
+        + IFNULL((SELECT SUM(amount) FROM django_bitcoin_wallettransaction wt WHERE wt.to_wallet_id=%(id)s), 0)
+        - IFNULL((SELECT SUM(amount) FROM django_bitcoin_wallettransaction wt WHERE wt.from_wallet_id=%(id)s), 0) as total_balance;
+        """ % {'confirmed': ("least_received", "least_received_confirmed")[confirmed], 'id': self.id}
+        cursor.execute(sql)
+        return cursor.fetchone()[0]
 
     def total_balance(self, minconf=settings.BITCOIN_MINIMUM_CONFIRMATIONS):
         """
         Returns the total confirmed balance from the Wallet.
         """
         if not settings.BITCOIN_UNCONFIRMED_TRANSFERS:
-            db_transaction.enter_transaction_management()
-            db_transaction.commit()
+            if settings.BITCOIN_TRANSACTION_SIGNALING:
+                if minconf == settings.BITCOIN_MINIMUM_CONFIRMATIONS:
+                    return self.total_balance_sql()
+                elif mincof == 0:
+                    self.total_balance_sql(False)
             return self.total_received(minconf) - self.total_sent()
         else:
             return self.balance(minconf)[1]
