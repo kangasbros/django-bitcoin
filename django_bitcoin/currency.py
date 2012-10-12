@@ -201,6 +201,88 @@ CURRENCY_CHOICES = (
 
 RATE_PERIOD_CHOICES=("24h", "7d", "30d",)
 
+market_parameters=('high', 'low', 'bid', 'ask', 'close',)
+
+
+def markets_chart():
+    cache_key="bitcoincharts_markets"
+    cache_key_old="bitcoincharts_markets_old"
+    if not cache.get(cache_key):
+        try:
+            f = urllib2.urlopen(
+                u"http://bitcoincharts.com/t/markets.json")
+            result=f.read()
+            j=json.loads(result)
+            final_markets={}
+            for market in j:
+                b=True
+                for mp in market_parameters:
+                    if not market[mp]:
+                        b=False
+                        break
+                if b:
+                    # print market['symbol']
+                    final_markets[market['symbol'].lower()]=market
+            cache.set(cache_key, final_markets, 60*5)
+            #print result
+        except Exception, err:
+            print "Unexpected error:", sys.exc_info()[0], err
+
+        if not cache.get(cache_key):
+            if not cache.get(cache_key_old):
+                raise Exception(
+                    "Cache not enabled, reliable market data is not available")
+            cache.set(cache_key, cache.get(cache_key_old), 60*5)
+
+        cache.set(cache_key_old, cache.get(cache_key), 60*60*24*7)
+    return cache.get(cache_key)
+
+
+def currency_exchange_rates():
+    cache_key="currency_exchange_rates"
+    cache_key_old="currency_exchange_rates_old"
+    if not cache.get(cache_key):
+        try:
+            f = urllib2.urlopen(
+                u"http://openexchangerates.org/latest.json")
+            result=f.read()
+            j=json.loads(result)
+            cache.set(cache_key, j, 60*5)
+            #print result
+        except Exception, err:
+            print "Unexpected error:", sys.exc_info()[0], err
+
+        if not cache.get(cache_key):
+            if not cache.get(cache_key_old):
+                raise Exception(
+                    "Cache not enabled, reliable market data is not available")
+            cache.set(cache_key, cache.get(cache_key_old), 60*5)
+
+        cache.set(cache_key_old, cache.get(cache_key), 60*60*24*7)
+    return cache.get(cache_key)
+
+
+MTGOX_CURRENCIES = ("USD", "EUR", "AUD", "CAD", "CHF", "CNY", "DKK", 
+    "GBP", "HKD", "JPY", "NZD", "PLN", "RUB", "SEK", "SGD", "THB")
+
+def get_mtgox_rate_table():
+    cache_key_old="bitcoincharts_all_old"
+    old_table = cache.get(cache_key_old)
+    if not old_table:
+        old_table = {}
+        for c in MTGOX_CURRENCIES:
+            old_table[c] = {'24h': None, '7d': None, '30d': None}
+    for c in MTGOX_CURRENCIES:
+        try:
+            f = urllib2.urlopen(
+                u"https://mtgox.com/api/1/BTC"+c+"/ticker")
+            result=f.read()
+            j=json.loads(result)
+            old_table[c]['24h'] = Decimal(j['vwap']['value'])
+        except Exception, err:
+            print "Unexpected error:", sys.exc_info()[0], err
+
+
 def get_rate_table():
     cache_key="bitcoincharts_all"
     cache_key_old="bitcoincharts_all_old"
@@ -212,6 +294,8 @@ def get_rate_table():
             j=json.loads(result)
             cache.set(cache_key, j, 60*60)
             print result
+        # except ValueError:
+
         except:
             print "Unexpected error:", sys.exc_info()[0]
 
@@ -263,12 +347,16 @@ def get_currency_rate(currency="USD", rate_period="24h"):
             return None
 
 def btc2currency(amount, currency="USD", rate_period="24h"):
+    if currency == "BTC":
+        return amount
     rate=get_currency_rate(currency, rate_period)
     if rate==None:
         return None
     return (amount*rate).quantize(Decimal("0.01"))
 
 def currency2btc(amount, currency="USD", rate_period="24h"):
+    if currency == "BTC":
+        return amount
     rate=get_currency_rate(currency, rate_period)
     if rate==None:
         return None

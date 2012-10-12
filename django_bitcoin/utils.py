@@ -51,8 +51,14 @@ class BitcoindConnection(object):
             for_account or self.account_name, *args, **kwargs)
     
     def gettransaction(self, txid, *args, **kwargs):
-        dir (self.bitcoind_api)
+        # dir (self.bitcoind_api)
         return self.bitcoind_api.gettransaction(txid, *args, **kwargs)
+
+    # if address_to is defined, also empties the private key to that address
+    def importprivatekey(self, key, address_to=None):
+        pass
+        # self.bitcoind_api.gettransaction(txid, )
+        # return self.bitcoind_api.gettransaction(txid, *args, **kwargs)
 
 bitcoind = BitcoindConnection(settings.BITCOIND_CONNECTION_STRING,
                               settings.MAIN_ACCOUNT)

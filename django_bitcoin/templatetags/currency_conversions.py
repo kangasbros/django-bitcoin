@@ -14,14 +14,19 @@ register = template.Library()
 
 @register.filter
 def bitcoinformat(value):
+    # print "bitcoinformat", value
     if value == None:
         return None
+    if not (isinstance(value, float) or isinstance(value, Decimal)):
+        return str(value).rstrip('0').rstrip('.')
     return ("%.8f" % value).rstrip('0').rstrip('.')
 
 @register.filter
 def currencyformat(value):
     if value == None:
         return None
+    if not (isinstance(value, float) or isinstance(value, Decimal)):
+        return str(value).rstrip('0').rstrip('.')
     return ("%.2f" % value)
 
 @register.filter
@@ -56,9 +61,11 @@ def currency2btc(value, other_currency="USD", rate_period="24h"):
 def exchangerates_json():
     return json.dumps(currency.get_rate_table())
 
+
 @register.inclusion_tag('wallet_history.html')
 def wallet_history(wallet):
     return {'wallet': wallet}
+
 
 @register.filter
 def show_addr(address, arg):
@@ -72,9 +79,11 @@ def show_addr(address, arg):
     else:
         return link % (address, address[:8])
 
+
 @register.inclusion_tag('wallet_tagline.html')
 def wallet_tagline(wallet):
     return {'wallet': wallet, 'balance_usd': btc2usd(wallet.total_balance())}
+
 
 @register.inclusion_tag('bitcoin_payment_qr.html')
 def bitcoin_payment_qr(address, amount=Decimal("0"), description='', display_currency=''):

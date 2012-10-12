@@ -16,7 +16,7 @@ class BCAddressField(forms.CharField):
         super(BCAddressField, self).__init__(*args, **kwargs)
 
     def clean(self, value):
-        if not value:
+        if not value and not self.required:
             return None
         value = value.strip()
         if re.match(r"[a-zA-Z1-9]{27,35}$", value) is None:
@@ -94,7 +94,10 @@ def b58decode(v, length):
 def b36encode(number, alphabet='0123456789abcdefghijklmnopqrstuvwxyz'):
     """Converts an integer to a base36 string."""
     if not isinstance(number, (int, long)):
-        raise TypeError('number must be an integer')
+        long_value = 0L
+        for (i, c) in enumerate(number[::-1]):
+            long_value += (256**i) * ord(c)
+        number = long_value
 
     base36 = '' if number != 0 else '0'
     sign = ''
