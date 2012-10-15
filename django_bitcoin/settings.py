@@ -61,3 +61,9 @@ BITCOIN_UNCONFIRMED_TRANSFERS = getattr(
     settings,
     "BITCOIN_UNCONFIRMED_TRANSFERS",
     False)
+
+
+BITCOIN_OPENEXCHANGERATES_URL = getattr(
+    settings,
+    "BITCOIN_OPENEXCHANGERATES_URL",
+    "http://openexchangerates.org/api/latest.json")
