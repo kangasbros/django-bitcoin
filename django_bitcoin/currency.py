@@ -308,13 +308,14 @@ def get_rate_table():
         cache.set(cache_key_old, cache.get(cache_key), 60*60*24*7)
     return cache.get(cache_key)
 
+
 def currency_exchange_rates():
     cache_key="currency_exchange_rates"
     cache_key_old="currency_exchange_rates_old"
     if not cache.get(cache_key):
         try:
             f = urllib2.urlopen(
-                u"http://openexchangerates.org/latest.json")
+                settings.BITCOIN_OPENEXCHANGERATES_URL)
             result=f.read()
             j=json.loads(result)
             cache.set(cache_key, j, 60*5)
