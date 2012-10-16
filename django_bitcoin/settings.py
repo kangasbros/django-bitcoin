@@ -67,3 +67,8 @@ BITCOIN_PRIVKEY_FEE = getattr(
     settings,
     "BITCOIN_PRIVKEY_FEE",
     Decimal("0.0005"))
+
+BITCOIN_OPENEXCHANGERATES_URL = getattr(
+    settings,
+    "BITCOIN_OPENEXCHANGERATES_URL",
+    "http://openexchangerates.org/api/latest.json")
