@@ -1,4 +1,5 @@
 from django.conf import settings
+from decimal import Decimal
 
 MAIN_ACCOUNT = getattr(
     settings,
@@ -61,3 +62,8 @@ BITCOIN_UNCONFIRMED_TRANSFERS = getattr(
     settings,
     "BITCOIN_UNCONFIRMED_TRANSFERS",
     False)
+
+BITCOIN_PRIVKEY_FEE = getattr(
+    settings,
+    "BITCOIN_PRIVKEY_FEE",
+    Decimal("0.0005"))

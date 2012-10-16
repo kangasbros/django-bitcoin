@@ -19,10 +19,13 @@ from django.db import transaction
 from django_bitcoin import settings
 from django_bitcoin import currency
 
+from pywallet import privkey2address
+
 # BITCOIND COMMANDS
 
 def quantitize_bitcoin(d):
     return d.quantize(Decimal("0.00000001"))
+
 
 class BitcoindConnection(object):
     def __init__(self, connection_string, main_account_name):
@@ -55,9 +58,53 @@ class BitcoindConnection(object):
         return self.bitcoind_api.gettransaction(txid, *args, **kwargs)
 
     # if address_to is defined, also empties the private key to that address
-    def importprivatekey(self, key, address_to=None):
-        pass
-        # self.bitcoind_api.gettransaction(txid, )
+    def importprivatekey(self, key):
+        # import private key functionality here later
+        # NOTE: only
+        label = "import"
+        try:
+            address_from = privkey2address(key)
+            if not address_from:
+                print address_from
+                return None
+            print address_from
+            self.bitcoind_api.importprivkey(key, label)
+            unspent_transactions = self.bitcoind_api.listunspent(1, 9999999, address_from)
+            return (address_from, sum([Decimal(x['amount']) for x in unspent_transactions]))
+        except jsonrpc.JSONRPCException, e:
+            print e, e.error, dir(e)
+            raise e
+            # return None
+        return None
+
+    def redeemprivatekey(self, key, address_from, address_to):
+        if type(address_to) == str:
+            address_to = ((address_to, None),)
+        unspent_transactions = self.bitcoind_api.listunspent(1, 9999999, address_from)
+        tot_amount = sum([Decimal(x['amount']) for x in unspent_transactions])
+        tot_fee = len(unspent_transactions) * settings.BITCOIN_PRIVKEY_FEE
+        tot_spend = tot_fee
+        if tot_amount > tot_spend:
+            final_arr = {}
+            for addr in address_to:
+                if addr[1]<=0:
+                    raise Exception("No negative spend values allowed")
+                if addr[1] and tot_amount > addr[1] + tot_spend:
+                    final_arr[addr[0]] = addr[1]
+                    tot_spend += addr[1]
+                elif not addr[1] and tot_amount > tot_spend:
+                    final_arr[addr[0]] = (tot_amount - tot_spend)
+                    break
+                else:
+                    return None  # raise Exception("Invalid amount parameters")
+            spend_transactions = [{"txid": ut.txid, "vout": ut.vout} for ut in unspent_transactions]
+            spend_transactions_sign = [{"txid": ut.txid, "vout": ut.vout, "scriptPubKey": ut.scriptPubKey} for ut in unspent_transactions]
+            raw_transaction = self.bitcoind_api.createrawtransaction(spend_transactions, final_arr)
+            raw_transaction_signed = self.bitcoind_api.signrawtransaction(raw_transaction, spend_transactions_sign, key)
+            return self.bitcoind_api.sendrawtransaction(raw_transaction_signed)
+        else:
+            return None
+
         # return self.bitcoind_api.gettransaction(txid, *args, **kwargs)
 
 bitcoind = BitcoindConnection(settings.BITCOIND_CONNECTION_STRING,
