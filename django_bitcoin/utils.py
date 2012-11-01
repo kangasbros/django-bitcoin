@@ -77,7 +77,7 @@ class BitcoindConnection(object):
         except jsonrpc.JSONRPCException:
             pass
         unspent_transactions = self.bitcoind_api.listunspent(1, 9999999, [address_from])
-        return (address_from, quantitize_bitcoin(sum([Decimal(x['amount']) for x in unspent_transactions])))
+        return (address_from, quantitize_bitcoin(Decimal(sum([Decimal(x['amount']) for x in unspent_transactions]))))
 
     def redeemprivatekey(self, key, address_from, address_to):
         if type(address_to) == str or type(address_to) == unicode:
