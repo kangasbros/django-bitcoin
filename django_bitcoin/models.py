@@ -365,7 +365,10 @@ class Wallet(models.Model):
         with db_transaction.autocommit():
             db_transaction.enter_transaction_management()
             db_transaction.commit()
-            avail = self.total_balance()
+            if settings.BITCOIN_UNCONFIRMED_TRANSFERS:
+                avail = self.total_balance_unconfirmed()
+            else:
+                avail = self.total_balance()
             updated = Wallet.objects.filter(Q(id=self.id)).update(last_balance=avail)
 
             if self == otherWallet:
@@ -379,7 +382,7 @@ class Wallet(models.Model):
             # concurrency check
             new_balance = avail - amount
             updated = Wallet.objects.filter(Q(id=self.id) & Q(transaction_counter=self.transaction_counter) & 
-                Q(last_balance=avail) )\
+                Q(last_balance=avail))\
               .update(last_balance=new_balance, transaction_counter=self.transaction_counter+1)
             if not updated:
                 print "wallet transaction concurrency:", new_balance, avail, self.transaction_counter, self.last_balance, self.total_balance()
