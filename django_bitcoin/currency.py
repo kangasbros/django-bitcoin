@@ -327,7 +327,7 @@ def currency_exchange_rates():
             if not cache.get(cache_key_old):
                 raise Exception(
                     "Cache not enabled, reliable market data is not available")
-            cache.set(cache_key, cache.get(cache_key_old), 60*5)
+            cache.set(cache_key, cache.get(cache_key_old), 60*60*2)
 
         cache.set(cache_key_old, cache.get(cache_key), 60*60*24*7)
     return cache.get(cache_key)
