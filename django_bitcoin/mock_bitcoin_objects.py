@@ -15,6 +15,13 @@ from django_bitcoin import utils
 #def test_wallet_received():
 #    ...
 
+import random
+import string
+ADDR_CHARS = '%s%s' % (string.letters, string.digits)
+ADDR_LEN = 34
+def create_address(self):
+    return ''.join([random.choice(ADDR_CHARS) for i in xrange(ADDR_LEN)])
+
 ## FIRST
 mock_bitcoind = mock.Mock(wraps=utils.bitcoind, spec=utils.bitcoind)
 
@@ -26,7 +33,7 @@ mock_bitcoind.total_received = mock.mocksignature(utils.bitcoind.total_received,
 mock_bitcoind.send = mock.mocksignature(utils.bitcoind.send)
 
 mock_bitcoind_address = mock.Mock()
-mock_bitcoind_address.return_value = '15EJtRsZAwwxtC4AiUS1ZsypGzk8WDLRFn'
+mock_bitcoind_address.side_effect = create_address
 
 mock_bitcoind.create_address = mock.mocksignature(utils.bitcoind.create_address, mock=mock_bitcoind_address)
 
@@ -41,7 +48,7 @@ mock_bitcoind_other.total_received = mock.mocksignature(utils.bitcoind.total_rec
 mock_bitcoind_other.send = mock.mocksignature(utils.bitcoind.send)
 
 mock_bitcoind_other_address = mock.Mock()
-mock_bitcoind_other_address.return_value = '15EJtRsZAwwxtC4AiUS1ZsypGzk8WDLRFn'
+mock_bitcoind_other_address.side_effect = create_address
 
 mock_bitcoind_other.create_address = mock.mocksignature(utils.bitcoind.create_address, mock=mock_bitcoind_other_address)
 
