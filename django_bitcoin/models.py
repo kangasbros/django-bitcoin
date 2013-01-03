@@ -98,18 +98,6 @@ class BitcoinAddress(models.Model):
             return u'%s (%s)' % (self.label, self.address)
         return self.address
 
-        updated = False
-        with db_transaction.autocommit():
-            db_transaction.enter_transaction_management()
-            db_transaction.commit()
-            addr = new_bitcoin_address()
-            updated = BitcoinAddress.objects.filter(Q(wallet_id=None) & Q(active=False))\
-              .update(last_balance=new_balance, transaction_counter=self.transaction_counter+1)
-            if not updated:
-                print "wallet transaction concurrency:", new_balance, avail, self.transaction_counter, self.last_balance, self.total_balance()
-                raise Exception(_("Concurrency error with transactions. Please try again."))
-            return addr.address
-
 
 def new_bitcoin_address():
     while True:
