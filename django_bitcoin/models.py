@@ -98,17 +98,38 @@ class BitcoinAddress(models.Model):
             return u'%s (%s)' % (self.label, self.address)
         return self.address
 
+        updated = False
+        with db_transaction.autocommit():
+            db_transaction.enter_transaction_management()
+            db_transaction.commit()
+            addr = new_bitcoin_address()
+            updated = BitcoinAddress.objects.filter(Q(wallet_id=None) & Q(active=False))\
+              .update(last_balance=new_balance, transaction_counter=self.transaction_counter+1)
+            if not updated:
+                print "wallet transaction concurrency:", new_balance, avail, self.transaction_counter, self.last_balance, self.total_balance()
+                raise Exception(_("Concurrency error with transactions. Please try again."))
+            return addr.address
 
-@transaction.commit_on_success
+
 def new_bitcoin_address():
-    bp=BitcoinAddress.objects.filter(active=False, wallet=None)
-    if len(bp)<1:
-        refill_payment_queue()
-        bp=BitcoinAddress.objects.filter(active=False, wallet=None)
-    bp=bp[0]
-    bp.active=True
-    bp.save()
-    return bp
+    while True:
+        with db_transaction.autocommit():
+            db_transaction.enter_transaction_management()
+            db_transaction.commit()
+            bp = BitcoinAddress.objects.filter(active=False, wallet__isnull=True)
+            if len(bp) < 1:
+                refill_payment_queue()
+                db_transaction.commit()
+                print "refilling queue...", bp
+            else:
+                bp = bp[0]
+                updated = BitcoinAddress.objects.select_for_update().filter(Q(id=bp.id) & Q(active=False) & Q(wallet__isnull=True))\
+                      .update(active=True)
+                db_transaction.commit()
+                if updated:
+                    return bp
+                else:
+                    print "wallet transaction concurrency:", bp.address
 
 
 class Payment(models.Model):
@@ -342,15 +363,21 @@ class Wallet(models.Model):
         #super(Wallet, self).save(*args, **kwargs) 
 
     def receiving_address(self, fresh_addr=True):
-        usable_addresses = self.addresses.filter(active=True).order_by("id")
-        if fresh_addr:
-            usable_addresses = usable_addresses.filter(least_received=Decimal(0))
-        if usable_addresses.count():
-            return usable_addresses[0].address
-        addr = new_bitcoin_address()
-        addr.wallet = self
-        addr.save()
-        return addr.address
+        while True:
+            usable_addresses = self.addresses.filter(active=True).order_by("id")
+            if fresh_addr:
+                usable_addresses = usable_addresses.filter(least_received=Decimal(0))
+            if usable_addresses.count():
+                return usable_addresses[0].address
+            addr = new_bitcoin_address()
+            updated = BitcoinAddress.objects.select_for_update().filter(Q(id=addr.id) & Q(active=True) & Q(wallet__isnull=True))\
+                          .update(active=True, wallet=self)
+            print "addr_id", addr.id, updated
+            # db_transaction.commit()
+            if updated:
+                return addr.address
+            else:
+                raise Exception("Concurrency error!")
 
     def static_receiving_address(self):
         ''' Returns a static receiving address for this Wallet object.'''
@@ -677,18 +704,12 @@ class Wallet(models.Model):
 
 
 def refill_payment_queue():
-    c=Payment.objects.filter(active=False).count()
-    if settings.BITCOIN_PAYMENT_BUFFER_SIZE>c:
-        for i in range(0,settings.BITCOIN_PAYMENT_BUFFER_SIZE-c):
-            bp=Payment()
-            bp.address=bitcoind.create_address()
-            bp.save()
-    c=BitcoinAddress.objects.filter(active=False).count()
+    c=BitcoinAddress.objects.filter(active=False, wallet=None).count()
+    # print "count", c
     if settings.BITCOIN_ADDRESS_BUFFER_SIZE>c:
         for i in range(0,settings.BITCOIN_ADDRESS_BUFFER_SIZE-c):
-            ba=BitcoinAddress()
-            ba.address=bitcoind.create_address()
-            ba.save()
+            BitcoinAddress.objects.create(address = bitcoind.create_address(), active=False)
+
 
 def update_payments():
     if not cache.get('last_full_check'):
