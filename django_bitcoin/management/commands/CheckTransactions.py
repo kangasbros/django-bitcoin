@@ -38,7 +38,7 @@ class Command(NoArgsCommand):
             for t in transactions:
                 if t[u'category'] != u'immature' and (not last_check_time or (int(t['time'])) >= last_check_time):
                     try:
-                        ba = BitcoinAddress.objects.get(address=t['address'])
+                        ba = BitcoinAddress.objects.get(address=t['address'], active=True, wallet__isnull=False)
                         if ba:
                             ba.query_bitcoind(0)
                         last_check_time = int(t['time'])
