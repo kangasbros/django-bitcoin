@@ -29,7 +29,7 @@ class Command(NoArgsCommand):
                 addresses = {}
                 for t in addresses_json:
                     addresses[t['address']] = Decimal(t['amount'])
-                for ba in BitcoinAddress.objects.filter(active=True):
+                for ba in BitcoinAddress.objects.filter(active=True, wallet__isnull=False):
                     if ba.address in addresses.keys() and\
                         ba.least_received < addresses[ba.address]:
                         ba.query_bitcoind()
@@ -46,7 +46,7 @@ class Command(NoArgsCommand):
                         pass
                 elif not last_check_time:
                     last_check_time = int(t['time'])
-            for ba in BitcoinAddress.objects.filter(active=True).extra(where=["least_received>least_received_confirmed"]):
+            for ba in BitcoinAddress.objects.filter(active=True, wallet__isnull=False).extra(where=["least_received>least_received_confirmed"]):
                 ba.query_bitcoind()
             if settings.DEBUG:
                 print "done, sleeping..."

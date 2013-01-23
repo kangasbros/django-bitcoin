@@ -73,16 +73,18 @@ class BitcoinAddress(models.Model):
             if settings.BITCOIN_TRANSACTION_SIGNALING:
                 if self.wallet:
                     balance_changed.send(sender=self.wallet, changed=(r - self.least_received), bitcoinaddress=self)
-            self.least_received = r
-            self.save()
+            # self.least_received = r
+            # self.save()
+            BitcoinAddress.objects.filter(id=self.id).update(least_received=r)
         if r > self.least_received_confirmed and \
             minconf >= settings.BITCOIN_MINIMUM_CONFIRMATIONS:
             if settings.BITCOIN_TRANSACTION_SIGNALING:
                 if self.wallet:
-                    balance_changed_confirmed.send(sender=self.wallet, 
+                    balance_changed_confirmed.send(sender=self.wallet,
                         changed=(r - self.least_received_confirmed), bitcoinaddress=self)
-            self.least_received_confirmed = r
-            self.save()
+            # self.least_received_confirmed = r
+            # self.save()
+            BitcoinAddress.objects.filter(id=self.id).update(least_received_confirmed=r)
         return r
 
     def received(self, minconf=settings.BITCOIN_MINIMUM_CONFIRMATIONS):
@@ -111,8 +113,8 @@ def new_bitcoin_address():
                 print "refilling queue...", bp
             else:
                 bp = bp[0]
-                updated = BitcoinAddress.objects.select_for_update().filter(Q(id=bp.id) & Q(active=False) & Q(wallet__isnull=True))\
-                      .update(active=True)
+                updated = BitcoinAddress.objects.select_for_update().filter(Q(id=bp.id) & Q(active=False) & Q(wallet__isnull=True) & \
+                    Q(least_received__lte=0)).update(active=True)
                 db_transaction.commit()
                 if updated:
                     return bp
@@ -358,7 +360,7 @@ class Wallet(models.Model):
             if usable_addresses.count():
                 return usable_addresses[0].address
             addr = new_bitcoin_address()
-            updated = BitcoinAddress.objects.select_for_update().filter(Q(id=addr.id) & Q(active=True) & Q(wallet__isnull=True))\
+            updated = BitcoinAddress.objects.select_for_update().filter(Q(id=addr.id) & Q(active=True) & Q(least_received__lte=0) & Q(wallet__isnull=True))\
                           .update(active=True, wallet=self)
             print "addr_id", addr.id, updated
             # db_transaction.commit()
