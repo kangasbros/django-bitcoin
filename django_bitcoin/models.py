@@ -106,7 +106,8 @@ def new_bitcoin_address():
         with db_transaction.autocommit():
             db_transaction.enter_transaction_management()
             db_transaction.commit()
-            bp = BitcoinAddress.objects.filter(active=False, wallet__isnull=True)
+            bp = BitcoinAddress.objects.filter(Q(active=False) & Q(wallet__isnull=True) & \
+                    Q(least_received__lte=0))
             if len(bp) < 1:
                 refill_payment_queue()
                 db_transaction.commit()
