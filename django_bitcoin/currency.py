@@ -2,8 +2,8 @@
 """Usage:
 
 >>> currency.exchange(
-...     currency.Money("10.0", "BTC"), 
-...     "BTC") 
+...     currency.Money("10.0", "BTC"),
+...     "BTC")
 Money("10.0", "BTC")
 
 Default valid currencies are BTC, EUR and USD. Change exchange rate
@@ -40,7 +40,7 @@ class ConversionError(Exception):
     pass
 
 class TemporaryConversionError(ConversionError):
-    pass 
+    pass
 
 class Exchange(object):
     def __init__(self):
@@ -68,14 +68,14 @@ class Exchange(object):
             raise ConversionError(
                 "Unknown source currency %(identifier)s. "
                 "Available currencies: %(currency_list)s" % {
-                    "identifier": money.identifier, 
+                    "identifier": money.identifier,
                     "currency_list": u", ".join(self.currencies.keys())})
 
         if target not in self.currencies:
             raise ConversionError(
                 "Unknown target currency %(identifier)s. "
                 "Available currencies: %(currency_list)s" % {
-                    "identifier": target, 
+                    "identifier": target,
                     "currency_list": u", ".join(self.currencies.keys())})
 
         btc = self.currencies[money.identifier].to_btc(money.amount)
@@ -87,18 +87,18 @@ class Money(object):
         self.amount = decimal.Decimal(amount)
 
     def __add__(self, other):
-        if (not hasattr(other, "identifier") 
+        if (not hasattr(other, "identifier")
             or other.identifier != self.identifier):
             raise ConversionError("Cannot add different currencies "
                                   "or non-currencies together")
         return Money(self.identifier, self.amount + other.amount)
 
     def __sub__(self, other):
-        if (not hasattr(other, "identifier") 
+        if (not hasattr(other, "identifier")
             or other.identifier != self.identifier):
             raise ConversionError("Cannot subtract different currencies "
                                   "or non-currencies together")
-        return Money(self.identifier, self.amount - other.amount) 
+        return Money(self.identifier, self.amount - other.amount)
 
     def __mul__(self, other):
         if hasattr(other, "identifier"):
@@ -148,7 +148,7 @@ class BitcoinChartsCurrency(Currency):
             #print result
         except:
             print "Unexpected error:", sys.exc_info()[0]
-        
+
         if not cache.get(self.cache_key):
             if not cache.get(self.cache_key_old):
                 raise TemporaryConversionError(
@@ -262,7 +262,7 @@ def currency_exchange_rates():
     return cache.get(cache_key)
 
 
-MTGOX_CURRENCIES = ("USD", "EUR", "AUD", "CAD", "CHF", "CNY", "DKK", 
+MTGOX_CURRENCIES = ("USD", "EUR", "AUD", "CAD", "CHF", "CNY", "DKK",
     "GBP", "HKD", "JPY", "NZD", "PLN", "RUB", "SEK", "SGD", "THB")
 
 def get_mtgox_rate_table():

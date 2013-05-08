@@ -40,16 +40,16 @@ currencies = (
 # http://blockchain.info/double-spends
 # for an informed decision.
 confirmation_choices = (
-    (0, "0, (quick, recommended)"), 
-    (1, "1, (safer, slower for the buyer)"), 
-    (5, "5, (for the paranoid, not recommended)") 
+    (0, "0, (quick, recommended)"),
+    (1, "1, (safer, slower for the buyer)"),
+    (5, "5, (for the paranoid, not recommended)")
 )
 
 class Transaction(models.Model):
     created_at = models.DateTimeField(default=datetime.datetime.now)
     amount = models.DecimalField(
-        max_digits=16, 
-        decimal_places=8, 
+        max_digits=16,
+        decimal_places=8,
         default=Decimal("0.0"))
     address = models.CharField(max_length=50)
 
@@ -351,7 +351,7 @@ class Wallet(models.Model):
         '''No need for labels.'''
         self.updated_at = datetime.datetime.now()
         super(Wallet, self).save(*args, **kwargs)
-        #super(Wallet, self).save(*args, **kwargs) 
+        #super(Wallet, self).save(*args, **kwargs)
 
     def receiving_address(self, fresh_addr=True):
         while True:
@@ -399,7 +399,7 @@ class Wallet(models.Model):
                 raise Exception(_("Trying to send too much"))
             # concurrency check
             new_balance = avail - amount
-            updated = Wallet.objects.filter(Q(id=self.id) & Q(transaction_counter=self.transaction_counter) & 
+            updated = Wallet.objects.filter(Q(id=self.id) & Q(transaction_counter=self.transaction_counter) &
                 Q(last_balance=avail))\
               .update(last_balance=new_balance, transaction_counter=self.transaction_counter+1)
             if not updated:
@@ -417,15 +417,15 @@ class Wallet(models.Model):
             self.last_balance = new_balance
             # updated = Wallet.objects.filter(Q(id=otherWallet.id))\
             #   .update(last_balance=otherWallet.total_balance())
-        
+
             if settings.BITCOIN_TRANSACTION_SIGNALING:
-                balance_changed.send(sender=self, 
+                balance_changed.send(sender=self,
                     changed=(Decimal(-1) * amount), transaction=transaction)
-                balance_changed.send(sender=otherWallet, 
+                balance_changed.send(sender=otherWallet,
                     changed=(amount), transaction=transaction)
-                balance_changed_confirmed.send(sender=self, 
+                balance_changed_confirmed.send(sender=self,
                     changed=(Decimal(-1) * amount), transaction=transaction)
-                balance_changed_confirmed.send(sender=otherWallet, 
+                balance_changed_confirmed.send(sender=otherWallet,
                     changed=(amount), transaction=transaction)
             return transaction
 
@@ -451,7 +451,7 @@ class Wallet(models.Model):
             if amount > avail:
                 raise Exception(_("Trying to send too much"))
             new_balance = avail - amount
-            updated = Wallet.objects.filter(Q(id=self.id) & Q(transaction_counter=self.transaction_counter) & 
+            updated = Wallet.objects.filter(Q(id=self.id) & Q(transaction_counter=self.transaction_counter) &
                 Q(last_balance=avail) )\
               .update(last_balance=new_balance, transaction_counter=self.transaction_counter+1)
             if not updated:
@@ -470,7 +470,7 @@ class Wallet(models.Model):
                 raise
             self.transaction_counter = self.transaction_counter+1
             self.last_balance = new_balance
-        
+
             # check if a transaction fee exists, and deduct it from the wallet
             # TODO: because fee can't be known beforehand, can result in negative wallet balance.
             # currently isn't much of a issue, but might be in the future, depending of the application
@@ -483,9 +483,9 @@ class Wallet(models.Model):
                     from_wallet=self)
                 total_amount += fee_transaction.amount
             if settings.BITCOIN_TRANSACTION_SIGNALING:
-                balance_changed.send(sender=self, 
+                balance_changed.send(sender=self,
                     changed=(Decimal(-1) * total_amount), transaction=bwt)
-                balance_changed_confirmed.send(sender=self, 
+                balance_changed_confirmed.send(sender=self,
                     changed=(Decimal(-1) * total_amount), transaction=bwt)
             return (bwt, fee_transaction)
 
@@ -685,7 +685,7 @@ class Wallet(models.Model):
 #         super(BitcoinEscrow, self).save(**kwargs)
 #         if not self.confirm_hash:
 #             self.confirm_hash=generateuniquehash(
-#                 length=32, 
+#                 length=32,
 #                 extradata=str(self.id))
 #             super(BitcoinEscrow, self).save(**kwargs)
 
@@ -748,5 +748,43 @@ for dottedpath in settings.BITCOIN_CURRENCIES:
     mod, func = urlresolvers.get_mod_func(dottedpath)
     klass = getattr(importlib.import_module(mod), func)
     currency.exchange.register_currency(klass())
+
+# Historical prie storage
+
+class HistoricalPrice(models.Model):
+    created_at = models.DateTimeField(auto_now_add=True)
+    price = models.DecimalField(max_digits=16, decimal_places=2)
+    params = models.CharField(max_length=50)
+    currency = models.CharField(max_length=10)
+
+    class Meta:
+        verbose_name = _('HistoricalPrice')
+        verbose_name_plural = _('HistoricalPrices')
+
+    def __unicode__(self):
+        return str(self.created_at) + " - " + str(self.price) + " - " + str(self.params)
+
+def set_historical_price(curr="EUR"):
+    markets = currency.markets_chart()
+    # print markets
+    markets_currency = sorted(filter(lambda m: m['currency']==curr and m['volume']>1, markets.values()), key=lambda m: -m['volume'])[:3]
+    # print markets_currency
+    price = sum([m['close'] for m in markets_currency]) / len(markets_currency)
+    hp = HistoricalPrice.objects.create(price=Decimal(str(price)), params=",".join([m['symbol'] for m in markets_currency]), currency=curr)
+    return price
+
+def get_historical_price(curr="EUR", dt=None):
+    query = HistoricalPrice.objects.filter(currency=curr)
+    if dt:
+        query = HistoricalPrice.objects.filter(created_at__lte=dt, created_at__gte=dt - datetime.timedelta).order_by("-id")[0].price
+    try:
+        return HistoricalPrice.objects.filter(currency=curr,
+            created_at__gte=datetime.datetime.now() - datetime.timedelta(hours=settings.HISTORICALPRICES_FETCH_TIMESPAN_MINUTES)).\
+            order_by("-id")[0].price
+    except IndexError:
+        return set_historical_price()
+
+
+
 
 # EOF

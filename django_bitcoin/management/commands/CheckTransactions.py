@@ -22,8 +22,7 @@ class Command(NoArgsCommand):
         start_time = time()
         last_check_time = None
         while time() - start_time < float(RUN_TIME_SECONDS):
-            if settings.DEBUG:
-                print "starting..."
+            print "starting...", time() - start_time
             if not last_check_time:
                 addresses_json = bitcoind.bitcoind_api.listreceivedbyaddress(0, True)
                 addresses = {}
@@ -34,6 +33,7 @@ class Command(NoArgsCommand):
                         ba.least_received < addresses[ba.address]:
                         ba.query_bitcoind()
                         ba.query_bitcoind(0)
+            print "finished initial", time() - start_time
             transactions = bitcoind.bitcoind_api.listtransactions()
             for t in transactions:
                 if t[u'category'] != u'immature' and (not last_check_time or (int(t['time'])) >= last_check_time):
@@ -48,6 +48,5 @@ class Command(NoArgsCommand):
                     last_check_time = int(t['time'])
             for ba in BitcoinAddress.objects.filter(active=True, wallet__isnull=False).extra(where=["least_received>least_received_confirmed"]):
                 ba.query_bitcoind()
-            if settings.DEBUG:
-                print "done, sleeping..."
+            print "done, sleeping...", time() - start_time
             sleep(1)

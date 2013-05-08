@@ -49,7 +49,7 @@ class BitcoindConnection(object):
             return cached
         return decimal.Decimal(
                 self.bitcoind_api.getreceivedbyaddress(address, minconf))
-    
+
     def send(self, address, amount, *args, **kwargs):
         #print "sending", address, amount
         return self.bitcoind_api.sendtoaddress(address, float(amount), *args, **kwargs)
@@ -57,7 +57,7 @@ class BitcoindConnection(object):
     def create_address(self, for_account=None, *args, **kwargs):
         return self.bitcoind_api.getnewaddress(
             for_account or self.account_name, *args, **kwargs)
-    
+
     def gettransaction(self, txid, *args, **kwargs):
         # dir (self.bitcoind_api)
         return self.bitcoind_api.gettransaction(txid, *args, **kwargs)
@@ -118,7 +118,7 @@ bitcoind = BitcoindConnection(settings.BITCOIND_CONNECTION_STRING,
                               settings.MAIN_ACCOUNT)
 
 def bitcoin_getnewaddress(account_name=None):
-    warnings.warn("Use bitcoind.create_address(...) instead",    
+    warnings.warn("Use bitcoind.create_address(...) instead",
                   DeprecationWarning)
     return bitcoind.create_address(account_name=account_name)
 

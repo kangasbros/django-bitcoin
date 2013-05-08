@@ -72,3 +72,8 @@ BITCOIN_OPENEXCHANGERATES_URL = getattr(
     settings,
     "BITCOIN_OPENEXCHANGERATES_URL",
     "http://openexchangerates.org/api/latest.json")
+
+HISTORICALPRICES_FETCH_TIMESPAN_MINUTES = getattr(
+    settings,
+    "HISTORICALPRICES_FETCH_TIMESPAN_HOURS",
+    60)
