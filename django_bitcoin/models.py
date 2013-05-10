@@ -776,11 +776,14 @@ def set_historical_price(curr="EUR"):
 def get_historical_price(curr="EUR", dt=None):
     query = HistoricalPrice.objects.filter(currency=curr)
     if dt:
-        query = HistoricalPrice.objects.filter(created_at__lte=dt, created_at__gte=dt - datetime.timedelta).order_by("-id")[0].price
+        try:
+            query = HistoricalPrice.objects.filter(created_at__lte=dt).order_by("-created_at")[0].price
+        except IndexError:
+            return None
     try:
         return HistoricalPrice.objects.filter(currency=curr,
             created_at__gte=datetime.datetime.now() - datetime.timedelta(hours=settings.HISTORICALPRICES_FETCH_TIMESPAN_MINUTES)).\
-            order_by("-id")[0].price
+            order_by("-created_at")[0].price
     except IndexError:
         return set_historical_price()
 
