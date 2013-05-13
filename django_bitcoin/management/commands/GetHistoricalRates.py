@@ -8,7 +8,6 @@ import commands
 import urllib2
 import urllib
 import json
-import numpy
 import random
 from time import sleep
 import math

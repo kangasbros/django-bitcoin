@@ -771,7 +771,7 @@ def set_historical_price(curr="EUR"):
     # print markets_currency
     price = sum([m['close'] for m in markets_currency]) / len(markets_currency)
     hp = HistoricalPrice.objects.create(price=Decimal(str(price)), params=",".join([m['symbol'] for m in markets_currency]), currency=curr)
-    return price
+    return hp.price
 
 def get_historical_price(curr="EUR", dt=None):
     query = HistoricalPrice.objects.filter(currency=curr)
