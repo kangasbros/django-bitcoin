@@ -25,7 +25,6 @@ To install, just add the app to your settings.py INSTALLED_APPS like::
         'django_bitcoin',
         ...
     ]
-    ```
 
 Also you have to run a local bitcoind instance, and specify connection string in settings::
 

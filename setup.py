@@ -1,8 +1,6 @@
 from setuptools import setup
 
 
-VERSION = "0.2"
-
 template_patterns = ['templates/*.html',
                      'templates/*/*.html',
                      'templates/*/*/*.html',
