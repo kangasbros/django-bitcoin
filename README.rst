@@ -4,6 +4,8 @@ Introduction
 ``django-bitcoin`` is a `Django web framework <http://djangoproject.com/>`_
 application for building Bitcoin web apps.
 
+.. contents ::
+
 Features
 ============
 

@@ -2,8 +2,8 @@
 Changelog
 ===================
 
-0.2 (unreleased)
-------------------
+0.2 (2013-05-14)
+----------------
 
 - README.rst, change log and release process workflow updates [miohtama]
 
