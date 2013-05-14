@@ -15,12 +15,15 @@ packages = ['django_bitcoin',
             'django_bitcoin.migrations',
             'django_bitcoin.jsonrpc']
 
+long_description = open("README.rst") + "\n" + open("CHANGES.rst")
+
 setup(name='django-bitcoin',
       version='0.1',
       description='Bitcoin application integration for Django web framework',
       author='Jeremias Kangas',
       url='https://github.com/kangasbros/django-bitcoin',
       requires=["qrcode (>2.3.1)", "South (>0.7.4)"],
+      license="MIT",
       packages=packages,
       package_data=dict((package_name, template_patterns) for package_name in packages),
       )
