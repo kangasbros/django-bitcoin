@@ -1,0 +1,6 @@
+recursive-include vvv *
+recursive-include ghettoci *
+recursive-include scripts *
+recursive-include docs *
+include *
+global-exclude *.pyc
