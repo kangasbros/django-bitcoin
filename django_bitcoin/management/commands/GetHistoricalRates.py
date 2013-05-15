@@ -20,6 +20,6 @@ class Command(NoArgsCommand):
     help = 'Create a profile object for users which do not have one.'
 
     def handle_noargs(self, **options):
-    	u = datetime.utcnow()
-		u = u.replace(tzinfo=pytz.utc)
-        print datetime.datetime.now(), get_historical_price()
+        u = datetime.datetime.utcnow()
+        u = u.replace(tzinfo=pytz.utc)
+        print u, get_historical_price()
