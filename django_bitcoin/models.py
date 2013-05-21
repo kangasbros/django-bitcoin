@@ -597,6 +597,21 @@ class Wallet(models.Model):
         else:
             return self.balance(minconf)[1]
 
+    def total_balance_historical(self, balance_date, minconf=settings.BITCOIN_MINIMUM_CONFIRMATIONS):
+        if settings.BITCOIN_TRANSACTION_SIGNALING:
+            if minconf == settings.BITCOIN_MINIMUM_CONFIRMATIONS:
+                s = self.addresses.filter(created_at__lte=balance_date).aggregate(models.Sum("least_received_confirmed"))['least_received_confirmed__sum'] or Decimal(0)
+            elif minconf == 0:
+                s = self.addresses.filter(created_at__lte=balance_date).aggregate(models.Sum("least_received"))['least_received__sum'] or Decimal(0)
+            else:
+                s = sum([a.received(minconf=minconf) for a in self.addresses.filter(created_at__lte=balance_date)])
+        else:
+            s = sum([a.received(minconf=minconf) for a in self.addresses.filter(created_at__lte=balance_date)])
+        rt = self.received_transactions.filter(created_at__lte=balance_date).aggregate(models.Sum("amount"))['amount__sum'] or Decimal(0)
+        received = (s + rt)
+        sent = self.sent_transactions.filter(created_at__lte=balance_date).aggregate(models.Sum("amount"))['amount__sum'] or Decimal(0)
+        return received - sent
+
     def total_balance_unconfirmed(self):
         if not settings.BITCOIN_UNCONFIRMED_TRANSFERS:
             return self.total_received(0) - self.total_sent()
