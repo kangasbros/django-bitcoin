@@ -599,6 +599,21 @@ class Wallet(models.Model):
         else:
             return self.balance(minconf)[1]
 
+    def total_balance_historical(self, balance_date, minconf=settings.BITCOIN_MINIMUM_CONFIRMATIONS):
+        if settings.BITCOIN_TRANSACTION_SIGNALING:
+            if minconf == settings.BITCOIN_MINIMUM_CONFIRMATIONS:
+                s = self.addresses.filter(created_at__lte=balance_date).aggregate(models.Sum("least_received_confirmed"))['least_received_confirmed__sum'] or Decimal(0)
+            elif minconf == 0:
+                s = self.addresses.filter(created_at__lte=balance_date).aggregate(models.Sum("least_received"))['least_received__sum'] or Decimal(0)
+            else:
+                s = sum([a.received(minconf=minconf) for a in self.addresses.filter(created_at__lte=balance_date)])
+        else:
+            s = sum([a.received(minconf=minconf) for a in self.addresses.filter(created_at__lte=balance_date)])
+        rt = self.received_transactions.filter(created_at__lte=balance_date).aggregate(models.Sum("amount"))['amount__sum'] or Decimal(0)
+        received = (s + rt)
+        sent = self.sent_transactions.filter(created_at__lte=balance_date).aggregate(models.Sum("amount"))['amount__sum'] or Decimal(0)
+        return received - sent
+
     def total_balance_unconfirmed(self):
         if not settings.BITCOIN_UNCONFIRMED_TRANSFERS:
             return self.total_received(0) - self.total_sent()
@@ -750,5 +765,55 @@ for dottedpath in settings.BITCOIN_CURRENCIES:
     mod, func = urlresolvers.get_mod_func(dottedpath)
     klass = getattr(importlib.import_module(mod), func)
     currency.exchange.register_currency(klass())
+
+# Historical prie storage
+
+class HistoricalPrice(models.Model):
+    created_at = models.DateTimeField(auto_now_add=True)
+    price = models.DecimalField(max_digits=16, decimal_places=2)
+    params = models.CharField(max_length=50)
+    currency = models.CharField(max_length=10)
+
+    class Meta:
+        verbose_name = _('HistoricalPrice')
+        verbose_name_plural = _('HistoricalPrices')
+
+    def __unicode__(self):
+        return str(self.created_at) + " - " + str(self.price) + " - " + str(self.params)
+
+def set_historical_price(curr="EUR"):
+    markets = currency.markets_chart()
+    # print markets
+    markets_currency = sorted(filter(lambda m: m['currency']==curr and m['volume']>1, markets.values()), key=lambda m: -m['volume'])[:3]
+    # print markets_currency
+    price = sum([m['avg'] for m in markets_currency]) / len(markets_currency)
+    hp = HistoricalPrice.objects.create(price=Decimal(str(price)), params=",".join([m['symbol']+"_avg" for m in markets_currency]), currency=curr,
+            created_at=datetime.datetime.now())
+    print "Created new",hp
+    return hp
+
+def get_historical_price_object(dt=None, curr="EUR"):
+    query = HistoricalPrice.objects.filter(currency=curr)
+    if dt:
+        try:
+            query = query.filter(created_at__lte=dt).order_by("-created_at")
+            return query[0]
+        except IndexError:
+            return None
+    try:
+        # print datetime.datetime.now()
+        query=HistoricalPrice.objects.filter(currency=curr,
+            created_at__gte=datetime.datetime.now() - datetime.timedelta(minutes=settings.HISTORICALPRICES_FETCH_TIMESPAN_MINUTES)).\
+            order_by("-created_at")
+        # print query
+        return query[0]
+    except IndexError:
+        return set_historical_price()
+
+def get_historical_price(dt=None, curr="EUR"):
+    return get_historical_price_object().price
+
+
+
 
 # EOF

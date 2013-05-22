@@ -1,0 +1,6 @@
+Making a release::
+
+    source ~/code/plone-venv/bin/activate
+    python setup.py showdocs
+
+
