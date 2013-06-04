@@ -21,8 +21,8 @@ class Command(NoArgsCommand):
     def handle_noargs(self, **options):
         start_time = time()
         last_check_time = None
+        print "starting...", time() - start_time
         while time() - start_time < float(RUN_TIME_SECONDS):
-            print "starting...", time() - start_time
             if not last_check_time:
                 addresses_json = bitcoind.bitcoind_api.listreceivedbyaddress(0, True)
                 addresses = {}
@@ -33,7 +33,8 @@ class Command(NoArgsCommand):
                         ba.least_received < addresses[ba.address]:
                         ba.query_bitcoind()
                         ba.query_bitcoind(0)
-            print "finished initial", time() - start_time
+                print "finished heavy initial", time() - start_time
+            # print "starting standard", time() - start_time
             transactions = bitcoind.bitcoind_api.listtransactions()
             for t in transactions:
                 if t[u'category'] != u'immature' and (not last_check_time or (int(t['time'])) >= last_check_time):
