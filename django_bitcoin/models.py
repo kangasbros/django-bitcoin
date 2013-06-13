@@ -85,6 +85,8 @@ class BitcoinAddress(models.Model):
             # self.least_received_confirmed = r
             # self.save()
             BitcoinAddress.objects.filter(id=self.id).update(least_received_confirmed=r)
+            if self.wallet:
+                Wallet.objects.filter(id=self.wallet_id).update(last_balance=self.wallet.total_balance_sql())
         return r
 
     def received(self, minconf=settings.BITCOIN_MINIMUM_CONFIRMATIONS):
@@ -427,6 +429,10 @@ class Wallet(models.Model):
                     changed=(Decimal(-1) * amount), transaction=transaction)
                 balance_changed_confirmed.send(sender=otherWallet,
                     changed=(amount), transaction=transaction)
+            updated = Wallet.objects.filter(Q(id=otherWallet.id))\
+              .update(last_balance=otherWallet.total_balance_sql())
+            if not updated:
+                print "otherWallet failed updating", new_balance, avail
             return transaction
 
     def send_to_address(self, address, amount, description=''):
@@ -482,6 +488,10 @@ class Wallet(models.Model):
                     amount=Decimal(transaction['fee']) * Decimal(-1),
                     from_wallet=self)
                 total_amount += fee_transaction.amount
+                updated = Wallet.objects.filter(Q(id=self.id))\
+                    .update(last_balance=self.balance)
+                if not updated:
+                    print "address transaction concurrency:", new_balance, avail, self.transaction_counter, self.last_balance, self.total_balance()
             if settings.BITCOIN_TRANSACTION_SIGNALING:
                 balance_changed.send(sender=self,
                     changed=(Decimal(-1) * total_amount), transaction=bwt)

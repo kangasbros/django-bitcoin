@@ -4,6 +4,7 @@ from django_bitcoin.utils import bitcoind
 from django_bitcoin.models import BitcoinAddress
 from django.conf import settings
 from decimal import Decimal
+import datetime
 
 RUN_TIME_SECONDS = 60
 
@@ -21,8 +22,9 @@ class Command(NoArgsCommand):
     def handle_noargs(self, **options):
         start_time = time()
         last_check_time = None
+        print "starting overall1", time() - start_time, datetime.datetime.now()
         while time() - start_time < float(RUN_TIME_SECONDS):
-            print "starting...", time() - start_time
+            print "starting round", time() - start_time
             if not last_check_time:
                 addresses_json = bitcoind.bitcoind_api.listreceivedbyaddress(0, True)
                 addresses = {}
@@ -33,7 +35,9 @@ class Command(NoArgsCommand):
                         ba.least_received < addresses[ba.address]:
                         ba.query_bitcoind()
                         ba.query_bitcoind(0)
-            print "finished initial", time() - start_time
+                print "finished initial scan", time() - start_time
+                print "starting overall2", time() - start_time
+            # print "starting standard", time() - start_time
             transactions = bitcoind.bitcoind_api.listtransactions()
             for t in transactions:
                 if t[u'category'] != u'immature' and (not last_check_time or (int(t['time'])) >= last_check_time):
@@ -46,7 +50,9 @@ class Command(NoArgsCommand):
                         pass
                 elif not last_check_time:
                     last_check_time = int(t['time'])
+            print "done listtransactions checking, starting checking least_received>least_received_confirmed", time() - start_time
             for ba in BitcoinAddress.objects.filter(active=True, wallet__isnull=False).extra(where=["least_received>least_received_confirmed"]):
                 ba.query_bitcoind()
             print "done, sleeping...", time() - start_time
             sleep(1)
+        print "finished all", datetime.datetime.now()
