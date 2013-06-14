@@ -489,7 +489,7 @@ class Wallet(models.Model):
                     from_wallet=self)
                 total_amount += fee_transaction.amount
                 updated = Wallet.objects.filter(Q(id=self.id))\
-                    .update(last_balance=self.balance)
+                    .update(last_balance=new_balance - fee_transaction.amount)
                 if not updated:
                     print "address transaction concurrency:", new_balance, avail, self.transaction_counter, self.last_balance, self.total_balance()
             if settings.BITCOIN_TRANSACTION_SIGNALING:
