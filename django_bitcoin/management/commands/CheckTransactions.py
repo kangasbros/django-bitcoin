@@ -25,18 +25,6 @@ class Command(NoArgsCommand):
         print "starting overall1", time() - start_time, datetime.datetime.now()
         while time() - start_time < float(RUN_TIME_SECONDS):
             print "starting round", time() - start_time
-            if not last_check_time:
-                addresses_json = bitcoind.bitcoind_api.listreceivedbyaddress(0, True)
-                addresses = {}
-                for t in addresses_json:
-                    addresses[t['address']] = Decimal(t['amount'])
-                for ba in BitcoinAddress.objects.filter(active=True, wallet__isnull=False):
-                    if ba.address in addresses.keys() and\
-                        ba.least_received < addresses[ba.address]:
-                        ba.query_bitcoind()
-                        ba.query_bitcoind(0)
-                print "finished initial scan", time() - start_time
-                print "starting overall2", time() - start_time
             # print "starting standard", time() - start_time
             transactions = bitcoind.bitcoind_api.listtransactions()
             for t in transactions:
