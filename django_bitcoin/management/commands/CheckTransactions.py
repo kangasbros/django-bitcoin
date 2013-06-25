@@ -26,7 +26,7 @@ class Command(NoArgsCommand):
         while time() - start_time < float(RUN_TIME_SECONDS):
             print "starting round", time() - start_time
             # print "starting standard", time() - start_time
-            transactions = bitcoind.bitcoind_api.listtransactions()
+            transactions = bitcoind.bitcoind_api.listtransactions("*", 100, 0)
             for t in transactions:
                 if t[u'category'] != u'immature' and (not last_check_time or (int(t['time'])) >= last_check_time):
                     try:
