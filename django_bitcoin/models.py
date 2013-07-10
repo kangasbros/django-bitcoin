@@ -417,8 +417,8 @@ class Wallet(models.Model):
             # db_transaction.commit()
             self.transaction_counter = self.transaction_counter+1
             self.last_balance = new_balance
-            # updated = Wallet.objects.filter(Q(id=otherWallet.id))\
-            #   .update(last_balance=otherWallet.total_balance())
+            updated = Wallet.objects.filter(Q(id=otherWallet.id))\
+              .update(last_balance=otherWallet.total_balance_sql())
 
             if settings.BITCOIN_TRANSACTION_SIGNALING:
                 balance_changed.send(sender=self,
@@ -598,11 +598,12 @@ class Wallet(models.Model):
         Returns the total confirmed balance from the Wallet.
         """
         if not settings.BITCOIN_UNCONFIRMED_TRANSFERS:
-            # if settings.BITCOIN_TRANSACTION_SIGNALING:
-            #     if minconf == settings.BITCOIN_MINIMUM_CONFIRMATIONS:
-            #         return self.total_balance_sql()
-            #     elif mincof == 0:
-            #         self.total_balance_sql(False)
+            if settings.BITCOIN_TRANSACTION_SIGNALING:
+                if minconf == settings.BITCOIN_MINIMUM_CONFIRMATIONS:
+                    self.last_balance = self.total_balance_sql()
+                    return self.last_balance
+                elif mincof == 0:
+                    return self.total_balance_sql(False)
             return self.total_received(minconf) - self.total_sent()
         else:
             return self.balance(minconf)[1]
