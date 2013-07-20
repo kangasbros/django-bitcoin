@@ -491,6 +491,7 @@ class Wallet(models.Model):
                 result = bitcoind.send(address, amount)
             except jsonrpc.JSONRPCException:
                 bwt.delete()
+                updated2 = Wallet.objects.filter(Q(id=self.id) & Q(last_balance=new_balance)).update(last_balance=avail)
                 raise
             self.transaction_counter = self.transaction_counter+1
             self.last_balance = new_balance
