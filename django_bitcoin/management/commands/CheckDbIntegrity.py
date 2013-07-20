@@ -11,8 +11,9 @@ import json
 import random
 from time import sleep
 import math
-from django_bitcoin.models import Wallet, BitcoinAddress, WalletTransaction
+from django_bitcoin.models import Wallet, BitcoinAddress, WalletTransaction, DepositTransaction
 from django_bitcoin.utils import bitcoind
+from django.db.models import Avg, Max, Min, Sum
 
 class Command(NoArgsCommand):
     help = 'This checks that alles is in ordnung in django_bitcoin.'
@@ -34,4 +35,23 @@ class Command(NoArgsCommand):
         print "----"
         bitcoind_balance = bitcoind.bitcoind_api.getbalance()
         print "Bitcoind balance", bitcoind_balance
+        print "----"
+        print "Wallet check"
+        for w in Wallet.objects.filter(last_balance__gt=0):
+            lb = w.last_balance
+            tb_sql = w.total_balance_sql()
+            tb = w.total_balance()
+            if w.last_balance != tb or w.last_balance != tb:
+                print "Wallet balance error!", w.id, lb, tb_sql, tb
+            # if random.random() < 0.001:
+            #     sleep(1)
+        print "Address check"
+        for ba in BitcoinAddress.objects.filter(least_received_confirmed__gt=0):
+            dts = DepositTransaction.objects.filter(address=ba, wallet=ba.wallet)
+            s = dts.aggregate(Sum('amount'))['amount__sum'] or Decimal(0)
+            if s != ba.least_received_confirmed:
+                print
+            # if random.random() < 0.001:
+            #     sleep(1)
+
 
