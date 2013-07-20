@@ -13,4 +13,4 @@ class BitcoinEscrowBuyForm(ModelForm):
     class Meta:
         model=BitcoinEscrow
         fields = ('buyer_address', 'buyer_phone', 'buyer_email')
-        
+
