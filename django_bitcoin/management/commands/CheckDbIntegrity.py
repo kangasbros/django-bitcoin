@@ -37,18 +37,18 @@ class Command(NoArgsCommand):
         bitcoind_balance = bitcoind.bitcoind_api.getbalance()
         print "Bitcoind balance", bitcoind_balance
         print "----"
-from django.db.models import Avg, Max, Min, Sum
-print "Wallet check"
-for w in Wallet.objects.filter(last_balance__gt=0):
-    lb = w.last_balance
-    tb_sql = w.total_balance_sql()
-    tb = w.total_balance()
-    if lb != tb or w.last_balance != tb or tb != tb_sql:
-        print "Wallet balance error!", w.id, lb, tb_sql, tb
-        print w.sent_transactions.all().count()
-        print w.received_transactions.all().count()
-        print w.sent_transactions.all().aggregate(Max('created_at'))['created_at__max']
-        print w.received_transactions.all().aggregate(Max('created_at'))['created_at__max']
+        from django.db.models import Avg, Max, Min, Sum
+        print "Wallet check"
+        for w in Wallet.objects.filter(last_balance__gt=0):
+            lb = w.last_balance
+            tb_sql = w.total_balance_sql()
+            tb = w.total_balance()
+            if lb != tb or w.last_balance != tb or tb != tb_sql:
+                print "Wallet balance error!", w.id, lb, tb_sql, tb
+                print w.sent_transactions.all().count()
+                print w.received_transactions.all().count()
+                print w.sent_transactions.all().aggregate(Max('created_at'))['created_at__max']
+                print w.received_transactions.all().aggregate(Max('created_at'))['created_at__max']
                 # Wallet.objects.filter(id=w.id).update(last_balance=w.total_balance_sql())
         # print w.created_at, w.sent_transactions.all(), w.received_transactions.all()
             # if random.random() < 0.001:
