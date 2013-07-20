@@ -23,7 +23,14 @@ import jsonrpc
 from BCAddressField import is_valid_btc_address
 
 from django.db import transaction as db_transaction
+from celery import task
+from distributedlock import distributedlock, MemcachedLock, LockNotAcquiredError
 
+def CacheLock(key, lock=None, blocking=True, timeout=10):
+    if lock is None:
+        lock = MemcachedLock(key=key, client=cache, timeout=timeout)
+
+    return distributedlock(key, lock, blocking)
 
 balance_changed = django.dispatch.Signal(providing_args=["changed", "transaction", "bitcoinaddress"])
 balance_changed_confirmed = django.dispatch.Signal(providing_args=["changed", "transaction", "bitcoinaddress"])
@@ -70,6 +77,36 @@ class DepositTransaction(models.Model):
     def __unicode__(self):
         return self.address.address + u", " + unicode(self.amount)
 
+class OutgoingTransaction(models.Model):
+
+    created_at = models.DateTimeField(default=datetime.datetime.now)
+    expires_at = models.DateTimeField(default=datetime.datetime.now)
+    executed_at = models.DateTimeField(null=True,default=None)
+    under_execution = models.BooleanField(default=False)
+    to_bitcoinaddress = models.CharField(
+        max_length=50,
+        blank=True)
+    amount = models.DecimalField(
+        max_digits=16,
+        decimal_places=8,
+        default=Decimal("0.0"))
+    # description = models.CharField(max_length=100, blank=True)
+
+    txid = models.CharField(max_length=100, blank=True, null=True, default=None)
+
+    def __unicode__(self):
+        return self.address.address + u", " + unicode(self.amount)
+
+@task()
+def process_outgoing_transactions():
+    with CacheLock('process_outgoing_transactions'):
+        for ot in OutgoingTransaction.objects.filter(executed_at=None):
+            result = None
+            try:
+                result = bitcoind.send(ot.to_bitcoinaddress, ot.amount)
+            except jsonrpc.JSONRPCException:
+                raise
+            OutgoingTransaction.objects.filter(id=ot.id).update(executed_at=datetime.datetime.now(), txid=result)
 
 class BitcoinAddress(models.Model):
     address = models.CharField(max_length=50, unique=True)
@@ -309,6 +346,7 @@ class WalletTransaction(models.Model):
     to_bitcoinaddress = models.CharField(
         max_length=50,
         blank=True)
+    outgoing_transaction = models.ForeignKey('OutgoingTransaction', null=True, default=None)
     amount = models.DecimalField(
         max_digits=16,
         decimal_places=8,
@@ -482,39 +520,42 @@ class Wallet(models.Model):
                 print "address transaction concurrency:", new_balance, avail, self.transaction_counter, self.last_balance, self.total_balance()
                 raise Exception(_("Concurrency error with transactions. Please try again."))
             # concurrency check end
+            outgoing_transaction = OutgoingTransaction.objects.create(amount=amount, to_bitcoinaddress=address)
             bwt = WalletTransaction.objects.create(
                 amount=amount,
                 from_wallet=self,
                 to_bitcoinaddress=address,
+                outgoing_transaction=outgoing_transaction,
                 description=description)
-            try:
-                result = bitcoind.send(address, amount)
-            except jsonrpc.JSONRPCException:
-                bwt.delete()
-                updated2 = Wallet.objects.filter(Q(id=self.id) & Q(last_balance=new_balance)).update(last_balance=avail)
-                raise
+            process_outgoing_transactions.delay()
+            # try:
+            #     result = bitcoind.send(address, amount)
+            # except jsonrpc.JSONRPCException:
+            #     bwt.delete()
+            #     updated2 = Wallet.objects.filter(Q(id=self.id) & Q(last_balance=new_balance)).update(last_balance=avail)
+            #     raise
             self.transaction_counter = self.transaction_counter+1
             self.last_balance = new_balance
 
             # check if a transaction fee exists, and deduct it from the wallet
             # TODO: because fee can't be known beforehand, can result in negative wallet balance.
             # currently isn't much of a issue, but might be in the future, depending of the application
-            transaction = bitcoind.gettransaction(result)
-            fee_transaction = None
-            total_amount = amount
-            if Decimal(transaction['fee']) < Decimal(0):
-                fee_transaction = WalletTransaction.objects.create(
-                    amount=Decimal(transaction['fee']) * Decimal(-1),
-                    from_wallet=self)
-                total_amount += fee_transaction.amount
-                updated = Wallet.objects.filter(Q(id=self.id))\
-                    .update(last_balance=new_balance-fee_transaction.amount)
+            # transaction = bitcoind.gettransaction(result)
+            # fee_transaction = None
+            # total_amount = amount
+            # if Decimal(transaction['fee']) < Decimal(0):
+            #     fee_transaction = WalletTransaction.objects.create(
+            #         amount=Decimal(transaction['fee']) * Decimal(-1),
+            #         from_wallet=self)
+            #     total_amount += fee_transaction.amount
+            #     updated = Wallet.objects.filter(Q(id=self.id))\
+            #         .update(last_balance=new_balance-fee_transaction.amount)
             if settings.BITCOIN_TRANSACTION_SIGNALING:
                 balance_changed.send(sender=self,
-                    changed=(Decimal(-1) * total_amount), transaction=bwt)
+                    changed=(Decimal(-1) * amount), transaction=bwt)
                 balance_changed_confirmed.send(sender=self,
-                    changed=(Decimal(-1) * total_amount), transaction=bwt)
-            return (bwt, fee_transaction)
+                    changed=(Decimal(-1) * amount), transaction=bwt)
+            return (bwt, None)
 
     def update_transaction_cache(self,
                                  mincf=settings.BITCOIN_MINIMUM_CONFIRMATIONS):
