@@ -506,6 +506,8 @@ class Wallet(models.Model):
                     amount=Decimal(transaction['fee']) * Decimal(-1),
                     from_wallet=self)
                 total_amount += fee_transaction.amount
+                updated = Wallet.objects.filter(Q(id=self.id))\
+                    .update(last_balance=new_balance-fee_transaction.amount)
             if settings.BITCOIN_TRANSACTION_SIGNALING:
                 balance_changed.send(sender=self,
                     changed=(Decimal(-1) * total_amount), transaction=bwt)
