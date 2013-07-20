@@ -95,7 +95,7 @@ class OutgoingTransaction(models.Model):
     txid = models.CharField(max_length=100, blank=True, null=True, default=None)
 
     def __unicode__(self):
-        return self.address.address + u", " + unicode(self.amount)
+        return unicode(self.created_at) + ": " + self.to_bitcoinaddress + u", " + unicode(self.amount)
 
 @task()
 def process_outgoing_transactions():
