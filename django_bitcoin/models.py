@@ -108,6 +108,14 @@ def process_outgoing_transactions():
                 raise
             OutgoingTransaction.objects.filter(id=ot.id).update(executed_at=datetime.datetime.now(), txid=result)
 
+
+@task()
+def update_wallet_balance(wallet_id):
+    with CacheLock('update_wallet_balance_'+str(wallet_id)):
+        w = Wallet.objects.get(id=wallet_id)
+        Wallet.objects.filter(id=wallet_id).update(last_balance=w.total_balance_sql())
+
+
 class BitcoinAddress(models.Model):
     address = models.CharField(max_length=50, unique=True)
     created_at = models.DateTimeField(default=datetime.datetime.now)
@@ -127,10 +135,9 @@ class BitcoinAddress(models.Model):
             minconf >= settings.BITCOIN_MINIMUM_CONFIRMATIONS:
             if settings.BITCOIN_TRANSACTION_SIGNALING:
                 if self.wallet:
+                    update_wallet_balance.delay(self.wallet.id)
                     balance_changed_confirmed.send(sender=self.wallet,
                         changed=(r - self.least_received_confirmed), bitcoinaddress=self)
-            # self.least_received_confirmed = r
-            # self.save()
             BitcoinAddress.objects.filter(id=self.id).update(least_received_confirmed=r)
             if self.wallet:
                 DepositTransaction.objects.create(address=self, amount=r - self.least_received_confirmed, wallet=self.wallet)
@@ -477,8 +484,9 @@ class Wallet(models.Model):
             # db_transaction.commit()
             self.transaction_counter = self.transaction_counter+1
             self.last_balance = new_balance
-            updated = Wallet.objects.filter(Q(id=otherWallet.id))\
-              .update(last_balance=otherWallet.total_balance_sql())
+            # updated = Wallet.objects.filter(Q(id=otherWallet.id))\
+            #   .update(last_balance=otherWallet.total_balance_sql())
+            update_wallet_balance.delay(otherWallet.id)
 
             if settings.BITCOIN_TRANSACTION_SIGNALING:
                 balance_changed.send(sender=self,
