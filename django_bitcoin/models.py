@@ -135,14 +135,14 @@ class BitcoinAddress(models.Model):
             minconf >= settings.BITCOIN_MINIMUM_CONFIRMATIONS:
             if settings.BITCOIN_TRANSACTION_SIGNALING:
                 if self.wallet:
-                    update_wallet_balance.delay(self.wallet.id)
                     balance_changed_confirmed.send(sender=self.wallet,
                         changed=(r - self.least_received_confirmed), bitcoinaddress=self)
             BitcoinAddress.objects.filter(id=self.id).update(least_received_confirmed=r)
-            if self.wallet:
-                DepositTransaction.objects.create(address=self, amount=r - self.least_received_confirmed, wallet=self.wallet)
             if self.least_received < r:
                 BitcoinAddress.objects.filter(id=self.id).update(least_received=r)
+            if self.wallet:
+                DepositTransaction.objects.create(address=self, amount=r - self.least_received_confirmed, wallet=self.wallet)
+                update_wallet_balance.delay(self.wallet.id)
         elif r > self.least_received:
             if settings.BITCOIN_TRANSACTION_SIGNALING:
                 if self.wallet:
