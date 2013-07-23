@@ -71,6 +71,8 @@ class DepositTransaction(models.Model):
 
     wallet = models.ForeignKey("Wallet")
 
+    transaction = models.ForeignKey('WalletTransaction', null=True, default=None)
+
     confirmations = models.IntegerField(default=0)
     txid = models.CharField(max_length=100, blank=True, null=True)
 
@@ -126,31 +128,55 @@ class BitcoinAddress(models.Model):
 
     wallet = models.ForeignKey("Wallet", null=True, related_name="addresses")
 
+    migrated_to_transactions = models.BooleanField(default=False)
+
     class Meta:
         verbose_name_plural = 'Bitcoin addresses'
 
-    def query_bitcoind(self, minconf=settings.BITCOIN_MINIMUM_CONFIRMATIONS):
-        r = bitcoind.total_received(self.address, minconf=minconf)
-        if r > self.least_received_confirmed and \
-            minconf >= settings.BITCOIN_MINIMUM_CONFIRMATIONS:
-            if settings.BITCOIN_TRANSACTION_SIGNALING:
+    def query_bitcoind(self, minconf=settings.BITCOIN_MINIMUM_CONFIRMATIONS, triggered_tx=None):
+        with CacheLock('query_bitcoind_'+str(self.id)):
+            r = bitcoind.total_received(self.address, minconf=minconf)
+            if r > self.least_received_confirmed and \
+                minconf >= settings.BITCOIN_MINIMUM_CONFIRMATIONS:
+                transaction_amount = r - self.least_received_confirmed
+                if settings.BITCOIN_TRANSACTION_SIGNALING:
+                    if self.wallet:
+                        balance_changed_confirmed.send(sender=self.wallet,
+                            changed=(transaction_amount), bitcoinaddress=self)
+                BitcoinAddress.objects.filter(id=self.id).update(least_received_confirmed=r)
+                if self.least_received < r:
+                    BitcoinAddress.objects.filter(id=self.id).update(least_received=r)
                 if self.wallet:
-                    balance_changed_confirmed.send(sender=self.wallet,
-                        changed=(r - self.least_received_confirmed), bitcoinaddress=self)
-            BitcoinAddress.objects.filter(id=self.id).update(least_received_confirmed=r)
-            if self.least_received < r:
+                    dps = DepositTransaction.objects.filter(address=self, confirmations__lt=minconf,
+                        amount__lte=transaction_amount, wallet=self.wallet).extra(
+                            select={'exact_match': "amount="+str(transaction_amount)}
+                        ).order_by("-exact_match", "id")
+                    total_confirmed_amount = Decimal(0)
+                    confirmed_dps = []
+                    for dp in dps:
+                        if dp.amount <= transaction_amount - total_confirmed_amount:
+                            DepositTransaction.filter(id=dp.id).update(confirmations=minconf)
+                            total_confirmed_amount += dp.amount
+                            confirmed_dps.append(dp.id)
+                    if total_confirmed_amount < transaction_amount:
+                        dp = DepositTransaction.objects.create(address=self, amount=transaction_amount - total_confirmed_amount, wallet=self.wallet,
+                            confirmations=minconf, tx=triggered_tx)
+                        confirmed_dps.append(dp.id)
+                    if self.migrated_to_transactions:
+                        wt = WalletTransaction.objects.create(to_wallet=self.wallet, amount=transaction_amount, description=self.address)
+                        DepositTransaction.objects.filter(address=self, wallet=self.wallet, id__in=confirmed_dps).update(transaction=wt)
+                    update_wallet_balance.delay(self.wallet.id)
+            elif r > self.least_received:
+                if settings.BITCOIN_TRANSACTION_SIGNALING:
+                    if self.wallet:
+                        balance_changed.send(sender=self.wallet, changed=(r - self.least_received), bitcoinaddress=self)
+                # self.least_received = r
+                # self.save()
                 BitcoinAddress.objects.filter(id=self.id).update(least_received=r)
-            if self.wallet:
-                DepositTransaction.objects.create(address=self, amount=r - self.least_received_confirmed, wallet=self.wallet)
-                update_wallet_balance.delay(self.wallet.id)
-        elif r > self.least_received:
-            if settings.BITCOIN_TRANSACTION_SIGNALING:
                 if self.wallet:
-                    balance_changed.send(sender=self.wallet, changed=(r - self.least_received), bitcoinaddress=self)
-            # self.least_received = r
-            # self.save()
-            BitcoinAddress.objects.filter(id=self.id).update(least_received=r)
-        return r
+                    DepositTransaction.objects.create(address=self, amount=r - self.least_received, wallet=self.wallet,
+                        confirmations=0, tx=triggered_tx)
+            return r
 
     def received(self, minconf=settings.BITCOIN_MINIMUM_CONFIRMATIONS):
         if settings.BITCOIN_TRANSACTION_SIGNALING:
@@ -345,6 +371,7 @@ class WalletTransaction(models.Model):
     created_at = models.DateTimeField(default=datetime.datetime.now)
     from_wallet = models.ForeignKey(
         'Wallet',
+        null=True,
         related_name="sent_transactions")
     to_wallet = models.ForeignKey(
         'Wallet',
@@ -368,6 +395,11 @@ class WalletTransaction(models.Model):
         elif self.from_wallet and self.to_bitcoinaddress:
             return u"Outgoing bitcoin transaction "+unicode(self.amount)
         return u"Fee "+unicode(self.amount)
+
+    def clean(self):
+        from django.core.exceptions import ValidationError
+        if not self.from_wallet and not self.to_wallet:
+            raise ValidationError('Wallet transaction error - define a wallet.')
 
     def confirmation_status(self,
                             minconf=settings.BITCOIN_MINIMUM_CONFIRMATIONS,
@@ -652,7 +684,7 @@ class Wallet(models.Model):
         from django.db import connection
         cursor = connection.cursor()
         sql="""
-         SELECT IFNULL((SELECT SUM(%(confirmed)s) FROM django_bitcoin_bitcoinaddress ba WHERE ba.wallet_id=%(id)s), 0)
+         SELECT IFNULL((SELECT SUM(%(confirmed)s) FROM django_bitcoin_bitcoinaddress ba WHERE ba.wallet_id=%(id)s AND ba.migrated_to_transactions=0), 0)
         + IFNULL((SELECT SUM(amount) FROM django_bitcoin_wallettransaction wt WHERE wt.to_wallet_id=%(id)s), 0)
         - IFNULL((SELECT SUM(amount) FROM django_bitcoin_wallettransaction wt WHERE wt.from_wallet_id=%(id)s), 0) as total_balance;
         """ % {'confirmed': ("least_received", "least_received_confirmed")[confirmed], 'id': self.id}
@@ -678,11 +710,11 @@ class Wallet(models.Model):
     def total_balance_historical(self, balance_date, minconf=settings.BITCOIN_MINIMUM_CONFIRMATIONS):
         if settings.BITCOIN_TRANSACTION_SIGNALING:
             if minconf == settings.BITCOIN_MINIMUM_CONFIRMATIONS:
-                s = self.addresses.filter(created_at__lte=balance_date).aggregate(models.Sum("least_received_confirmed"))['least_received_confirmed__sum'] or Decimal(0)
+                s = self.addresses.filter(created_at__lte=balance_date, migrated_to_transactions=False).aggregate(models.Sum("least_received_confirmed"))['least_received_confirmed__sum'] or Decimal(0)
             elif minconf == 0:
-                s = self.addresses.filter(created_at__lte=balance_date).aggregate(models.Sum("least_received"))['least_received__sum'] or Decimal(0)
+                s = self.addresses.filter(created_at__lte=balance_date, migrated_to_transactions=False).aggregate(models.Sum("least_received"))['least_received__sum'] or Decimal(0)
             else:
-                s = sum([a.received(minconf=minconf) for a in self.addresses.filter(created_at__lte=balance_date)])
+                s = sum([a.received(minconf=minconf) for a in self.addresses.filter(created_at__lte=balance_date, migrated_to_transactions=False)])
         else:
             s = sum([a.received(minconf=minconf) for a in self.addresses.filter(created_at__lte=balance_date)])
         rt = self.received_transactions.filter(created_at__lte=balance_date).aggregate(models.Sum("amount"))['amount__sum'] or Decimal(0)
@@ -707,13 +739,13 @@ class Wallet(models.Model):
         """Returns the raw ammount ever received by this wallet."""
         if settings.BITCOIN_TRANSACTION_SIGNALING:
             if minconf == settings.BITCOIN_MINIMUM_CONFIRMATIONS:
-                s = self.addresses.aggregate(models.Sum("least_received_confirmed"))['least_received_confirmed__sum'] or Decimal(0)
+                s = self.addresses.filter(migrated_to_transactions=False).aggregate(models.Sum("least_received_confirmed"))['least_received_confirmed__sum'] or Decimal(0)
             elif minconf == 0:
-                s = self.addresses.aggregate(models.Sum("least_received"))['least_received__sum'] or Decimal(0)
+                s = self.addresses.filter(migrated_to_transactions=False).aggregate(models.Sum("least_received"))['least_received__sum'] or Decimal(0)
             else:
-                s = sum([a.received(minconf=minconf) for a in self.addresses.all()])
+                s = sum([a.received(minconf=minconf) for a in self.addresses.filter(migrated_to_transactions=False)])
         else:
-            s = sum([a.received(minconf=minconf) for a in self.addresses.all()])
+            s = sum([a.received(minconf=minconf) for a in self.addresses.filter(migrated_to_transactions=False)])
         rt = self.received_transactions.aggregate(models.Sum("amount"))['amount__sum'] or Decimal(0)
         return (s + rt)
 
