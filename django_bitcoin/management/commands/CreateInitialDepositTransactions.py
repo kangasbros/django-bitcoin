@@ -44,10 +44,10 @@ class Command(NoArgsCommand):
                 s = dts.aggregate(Sum('amount'))['amount__sum'] or Decimal(0)
                 if s < ba.least_received_confirmed and ba.least_received_confirmed > 0:
                     wt = WalletTransaction.objects.create(amount=ba.least_received_confirmed, to_wallet=ba.wallet, created_at=ba.created_at,
-                        description=u"Deposits "+ba.address+u" "+unicode(ba.created_at) + u" - "+unicode(dt_now))
+                        description=u"Deposits "+ba.address+u" "+ ba.created_at.strftime("%x")  + u" - "+ dt_now.strftime("%x") )
                     dt = DepositTransaction.objects.create(address=ba, amount=ba.least_received_confirmed, wallet=ba.wallet,
                         created_at=ba.created_at, transaction=wt, confirmations=settings.BITCOIN_MINIMUM_CONFIRMATIONS,
-                        description=u"Deposits "+ba.address+u" "+unicode(ba.created_at) + u" - "+unicode(dt_now))
+                        description=u"Deposits "+ba.address+u" "+ ba.created_at.strftime("%x")  + u" - "+ dt_now.strftime("%x"))
                     print dt.description, dt.amount
                 elif s > ba.least_received_confirmed:
                     print "TOO MUCH!!!", ba.address

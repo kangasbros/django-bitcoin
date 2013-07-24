@@ -136,6 +136,7 @@ class BitcoinAddress(models.Model):
     def query_bitcoind(self, minconf=settings.BITCOIN_MINIMUM_CONFIRMATIONS, triggered_tx=None):
         with CacheLock('query_bitcoind_'+str(self.id)):
             r = bitcoind.total_received(self.address, minconf=minconf)
+
             if r > self.least_received_confirmed and \
                 minconf >= settings.BITCOIN_MINIMUM_CONFIRMATIONS:
                 transaction_amount = r - self.least_received_confirmed
@@ -143,9 +144,12 @@ class BitcoinAddress(models.Model):
                     if self.wallet:
                         balance_changed_confirmed.send(sender=self.wallet,
                             changed=(transaction_amount), bitcoinaddress=self)
+
                 BitcoinAddress.objects.filter(id=self.id).update(least_received_confirmed=r)
+
                 if self.least_received < r:
                     BitcoinAddress.objects.filter(id=self.id).update(least_received=r)
+
                 if self.wallet:
                     dps = DepositTransaction.objects.filter(address=self, confirmations__lt=minconf,
                         amount__lte=transaction_amount, wallet=self.wallet).extra(
@@ -155,17 +159,18 @@ class BitcoinAddress(models.Model):
                     confirmed_dps = []
                     for dp in dps:
                         if dp.amount <= transaction_amount - total_confirmed_amount:
-                            DepositTransaction.filter(id=dp.id).update(confirmations=minconf)
+                            DepositTransaction.objects.filter(id=dp.id).update(confirmations=minconf)
                             total_confirmed_amount += dp.amount
                             confirmed_dps.append(dp.id)
                     if total_confirmed_amount < transaction_amount:
                         dp = DepositTransaction.objects.create(address=self, amount=transaction_amount - total_confirmed_amount, wallet=self.wallet,
-                            confirmations=minconf, tx=triggered_tx)
+                            confirmations=minconf, txid=triggered_tx)
                         confirmed_dps.append(dp.id)
                     if self.migrated_to_transactions:
                         wt = WalletTransaction.objects.create(to_wallet=self.wallet, amount=transaction_amount, description=self.address)
                         DepositTransaction.objects.filter(address=self, wallet=self.wallet, id__in=confirmed_dps).update(transaction=wt)
                     update_wallet_balance.delay(self.wallet.id)
+
             elif r > self.least_received:
                 if settings.BITCOIN_TRANSACTION_SIGNALING:
                     if self.wallet:
@@ -175,7 +180,7 @@ class BitcoinAddress(models.Model):
                 BitcoinAddress.objects.filter(id=self.id).update(least_received=r)
                 if self.wallet:
                     DepositTransaction.objects.create(address=self, amount=r - self.least_received, wallet=self.wallet,
-                        confirmations=0, tx=triggered_tx)
+                        confirmations=0, txid=triggered_tx)
             return r
 
     def received(self, minconf=settings.BITCOIN_MINIMUM_CONFIRMATIONS):
@@ -394,6 +399,8 @@ class WalletTransaction(models.Model):
             return u"Wallet transaction "+unicode(self.amount)
         elif self.from_wallet and self.to_bitcoinaddress:
             return u"Outgoing bitcoin transaction "+unicode(self.amount)
+        elif self.to_wallet and not self.from_wallet:
+            return u"Deposit "+unicode(self.amount)
         return u"Fee "+unicode(self.amount)
 
     def clean(self):
