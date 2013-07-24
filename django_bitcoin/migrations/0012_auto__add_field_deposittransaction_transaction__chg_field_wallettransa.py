@@ -23,14 +23,15 @@ class Migration(SchemaMigration):
 
 
     def backwards(self, orm):
+        pass
         # Deleting field 'DepositTransaction.transaction'
-        db.delete_column('django_bitcoin_deposittransaction', 'transaction_id')
+        # db.delete_column('django_bitcoin_deposittransaction', 'transaction_id')
 
 
         # User chose to not deal with backwards NULL issues for 'WalletTransaction.from_wallet'
-        raise RuntimeError("Cannot reverse this migration. 'WalletTransaction.from_wallet' and its values cannot be restored.")
+        #raise RuntimeError("Cannot reverse this migration. 'WalletTransaction.from_wallet' and its values cannot be restored.")
         # Deleting field 'BitcoinAddress.migrated_to_transactions'
-        db.delete_column('django_bitcoin_bitcoinaddress', 'migrated_to_transactions')
+        # db.delete_column('django_bitcoin_bitcoinaddress', 'migrated_to_transactions')
 
 
     models = {

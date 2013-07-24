@@ -70,7 +70,7 @@ class Command(NoArgsCommand):
             # if random.random() < 0.001:
             #     sleep(1)
         print "Address check"
-        for ba in BitcoinAddress.objects.filter(least_received_confirmed__gt=0):
+        for ba in BitcoinAddress.objects.filter(least_received_confirmed__gt=0, migrated_to_transactions=True):
             dts = DepositTransaction.objects.filter(address=ba, wallet=ba.wallet)
             s = dts.aggregate(Sum('amount'))['amount__sum'] or Decimal(0)
             if s != ba.least_received_confirmed:
