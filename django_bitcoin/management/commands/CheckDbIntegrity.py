@@ -38,6 +38,22 @@ class Command(NoArgsCommand):
         print "Bitcoind balance", bitcoind_balance
         print "----"
         from django.db.models import Avg, Max, Min, Sum
+        print "Migration check"
+        for ba in BitcoinAddress.objects.filter(migrated_to_transactions=False):
+            dts = ba.deposittransaction_set.filter(address=ba)
+            for dp in dts:
+                if dp.transaction:
+                    print "Bitcoinaddress migration error!", ba.address
+        print "BitcoinAddress check"
+        for ba in BitcoinAddress.objects.filter(migrated_to_transactions=True):
+            dts = ba.deposittransaction_set.filter(address=ba, confirmations__gte=settings.BITCOIN_MINIMUM_CONFIRMATIONS)
+            deposit_sum = dts.aggregate(Sum('amount'))['amount__sum'] or Decimal(0)
+            wt_sum = Decimal(0)
+            for dp in dts:
+                if dp.transaction:
+                    wt_sum += dp.transaction.amount
+            if wt_sum != deposit_sum or ba.least_received_confirmed != deposit_sum:
+                print "Bitcoinaddress integrity error!", ba.address, deposit_sum, wt_sum, ba.least_received_confirmed
         print "Wallet check"
         for w in Wallet.objects.filter(last_balance__gt=0):
             lb = w.last_balance
