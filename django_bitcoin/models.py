@@ -392,6 +392,7 @@ class WalletTransaction(models.Model):
         default=Decimal("0.0"))
     description = models.CharField(max_length=100, blank=True)
 
+    deposit_address = models.ForeignKey(BitcoinAddress, null=True)
     txid = models.CharField(max_length=100, blank=True, null=True)
 
     def __unicode__(self):
