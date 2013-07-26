@@ -167,7 +167,8 @@ class BitcoinAddress(models.Model):
                             confirmations=minconf, txid=triggered_tx)
                         confirmed_dps.append(dp.id)
                     if self.migrated_to_transactions:
-                        wt = WalletTransaction.objects.create(to_wallet=self.wallet, amount=transaction_amount, description=self.address)
+                        wt = WalletTransaction.objects.create(to_wallet=self.wallet, amount=transaction_amount, description=self.address,
+                            deposit_address=self)
                         DepositTransaction.objects.filter(address=self, wallet=self.wallet, id__in=confirmed_dps).update(transaction=wt)
                     update_wallet_balance.delay(self.wallet.id)
 

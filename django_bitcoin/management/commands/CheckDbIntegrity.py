@@ -38,7 +38,22 @@ class Command(NoArgsCommand):
         print "Bitcoind balance", bitcoind_balance
         print "----"
         from django.db.models import Avg, Max, Min, Sum
+        print "Wallet quick check"
+        total_sum = Decimal(0)
+        for w in Wallet.objects.filter(last_balance__lt=0):
+            if w.total_balance()<0:
+                bal = w.total_balance()
+                # print w.id, bal
+                total_sum += bal
+        print "Negatives:", Wallet.objects.filter(last_balance__lt=0).count(), "Amount:", total_sum
         print "Migration check"
+        tot_received = WalletTransaction.objects.filter(from_wallet=None).aggregate(Sum('amount'))['amount__sum'] or Decimal(0)
+        tot_received_bitcoinaddress = BitcoinAddress.objects.filter(migrated_to_transactions=True)\
+            .aggregate(Sum('least_received_confirmed'))['least_received_confirmed__sum'] or Decimal(0)
+        if tot_received != tot_received_bitcoinaddress:
+            raise Exception("wrong total receive amount! "+str(ba.address))
+        print "Total " + str(tot_received) + " BTC deposits migrated"
+        print "Migration check #2"
         for ba in BitcoinAddress.objects.filter(migrated_to_transactions=False):
             dts = ba.deposittransaction_set.filter(address=ba)
             for dp in dts:

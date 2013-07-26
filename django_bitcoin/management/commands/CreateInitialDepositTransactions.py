@@ -19,6 +19,14 @@ from decimal import Decimal
 from distributedlock import distributedlock, MemcachedLock, LockNotAcquiredError
 from django.core.cache import cache
 
+from django.db import transaction
+
+
+@transaction.commit_manually
+def flush_transaction():
+    transaction.commit()
+
+
 def CacheLock(key, lock=None, blocking=True, timeout=10):
     if lock is None:
         lock = MemcachedLock(key=key, client=cache, timeout=timeout)
@@ -36,6 +44,7 @@ class Command(NoArgsCommand):
 
         for w in Wallet.objects.all():
             for ba in BitcoinAddress.objects.filter(wallet=w).exclude(migrated_to_transactions=True):
+                original_balance = ba.wallet.last_balance
                 with CacheLock('query_bitcoind_'+str(ba.id)):
                     dts = DepositTransaction.objects.filter(address=ba, wallet=ba.wallet)
                     for dp in dts:
@@ -45,8 +54,9 @@ class Command(NoArgsCommand):
                     s = dts.aggregate(Sum('amount'))['amount__sum'] or Decimal(0)
                     if s < ba.least_received_confirmed and ba.least_received_confirmed > 0:
                         wt = WalletTransaction.objects.create(amount=ba.least_received_confirmed - s, to_wallet=ba.wallet, created_at=ba.created_at,
-                            description=u"Deposits "+ba.address+u" "+ ba.created_at.strftime("%x")  + u" - "+ dt_now.strftime("%x") )
-                        dt = DepositTransaction.objects.create(address=ba, amount=ba.least_received_confirmed - s, wallet=ba.wallet,
+                            description=u"Deposits "+ba.address+u" "+ ba.created_at.strftime("%x")  + u" - "+ dt_now.strftime("%x"),
+                            deposit_address=ba)
+                        dt = DepositTransaction.objects.create(address=ba, amount=wt.amount, wallet=ba.wallet,
                             created_at=ba.created_at, transaction=wt, confirmations=settings.BITCOIN_MINIMUM_CONFIRMATIONS,
                             description=u"Deposits "+ba.address+u" "+ ba.created_at.strftime("%x")  + u" - "+ dt_now.strftime("%x"))
                         print dt.description, dt.amount
@@ -55,13 +65,25 @@ class Command(NoArgsCommand):
                     elif s < ba.least_received_confirmed:
                         print "too little, address", ba.address, ba.least_received_confirmed, s
                     BitcoinAddress.objects.filter(id=ba.id).update(migrated_to_transactions=True)
+                flush_transaction()
+                wt_sum = WalletTransaction.objects.filter(deposit_address=ba).aggregate(Sum('amount'))['amount__sum'] or Decimal(0)
+                if wt_sum != ba.least_received_confirmed:
+                    raise Exception("wrong amount! "+str(ba.address))
+                w = Wallet.objects.get(id=ba.wallet.id)
+                if original_balance != w.total_balance_sql():
+                    raise Exception("wrong wallet amount! "+str(ba.address))
+                tot_received = WalletTransaction.objects.filter(from_wallet=None).aggregate(Sum('amount'))['amount__sum'] or Decimal(0)
+                tot_received_bitcoinaddress = BitcoinAddress.objects.filter(migrated_to_transactions=True)\
+                    .aggregate(Sum('least_received_confirmed'))['least_received_confirmed__sum'] or Decimal(0)
+                if tot_received != tot_received_bitcoinaddress:
+                    raise Exception("wrong total receive amount! "+str(ba.address))
 
-for ba in BitcoinAddress.objects.filter(migrated_to_transactions=True):
-    dts = ba.deposittransaction_set.filter(address=ba)
-    deposit_sum = dts.aggregate(Sum('amount'))['amount__sum'] or Decimal(0)
-    wt_sum = Decimal(0)
-    for dp in dts:
-        if dp.transaction:
-            wt_sum += dp.transaction.amount
-    if wt_sum != deposit_sum or ba.least_received_confirmed != deposit_sum:
-        print "Bitcoinaddress integrity error!", ba.address, deposit_sum, wt_sum, ba.least_received_confirmed
+        for ba in BitcoinAddress.objects.filter(migrated_to_transactions=True):
+            dts = ba.deposittransaction_set.filter(address=ba)
+            deposit_sum = dts.aggregate(Sum('amount'))['amount__sum'] or Decimal(0)
+            wt_sum = Decimal(0)
+            for dp in dts:
+                if dp.transaction:
+                    wt_sum += dp.transaction.amount
+            if wt_sum != deposit_sum or ba.least_received_confirmed != deposit_sum:
+                print "Bitcoinaddress integrity error!", ba.address, deposit_sum, wt_sum, ba.least_received_confirmed
