@@ -100,6 +100,7 @@ class OutgoingTransaction(models.Model):
         return unicode(self.created_at) + ": " + self.to_bitcoinaddress + u", " + unicode(self.amount)
 
 @task()
+@db_transaction.commit_manually
 def process_outgoing_transactions():
     with CacheLock('process_outgoing_transactions'):
         for ot in OutgoingTransaction.objects.filter(executed_at=None):
@@ -109,6 +110,73 @@ def process_outgoing_transactions():
             except jsonrpc.JSONRPCException:
                 raise
             OutgoingTransaction.objects.filter(id=ot.id).update(executed_at=datetime.datetime.now(), txid=result)
+            db_transaction.commit()
+            transaction = bitcoind.gettransaction(result)
+            if Decimal(transaction['fee']) < Decimal(0):
+                wt = ot.wallettransaction_set.all()[0]
+                fee_transaction = WalletTransaction.objects.create(
+                    amount=Decimal(transaction['fee']) * Decimal(-1),
+                    from_wallet_id=wt.from_wallet_id)
+            db_transaction.commit()
+
+# TODO: Group outgoing transactions to save on tx fees
+
+# def fee_wallet():
+#     master_wallet_id = cache.get("django_bitcoin_fee_wallet_id")
+#     if master_wallet_id:
+#         return Wallet.objects.get(id=master_wallet_id)
+#     try:
+#         mw = Wallet.objects.get(label="django_bitcoin_fee_wallet")
+#     except Wallet.DoesNotExist:
+#         mw = Wallet.objects.create(label="django_bitcoin_fee_wallet")
+#         mw.save()
+#     cache.set("django_bitcoin_fee_wallet_id", mw.id)
+#     return mw
+
+
+# @task()
+# @db_transaction.commit_manually
+# def process_outgoing_transactions():
+#     if OutgoingTransaction.objects.filter(executed_at=None, expires_at__lte=datetime.datetime.now()).count()>0:
+#         with CacheLock('process_outgoing_transactions'):
+#             transaction_hash = {}
+#             id_hash = {}
+#             id_array = []
+#             ot_array = []
+#             for ot in OutgoingTransaction.objects.filter(executed_at=None).order_by("expires_at"):
+#                 result = None
+#                 # try:
+#                 #     result = bitcoind.send(ot.to_bitcoinaddress, ot.amount)
+#                 # except jsonrpc.JSONRPCException:
+#                 #     raise
+#                 transaction_hash[ot.to_bitcoinaddress] = ot.amount
+#                 id_hash[ot.to_bitcoinaddress] = ot
+#                 id_array.append(ot.id)
+#                 ot_array.append(ot)
+#             try:
+#                 result = bitcoind.sendmany(transaction_hash)
+#             except jsonrpc.JSONRPCException:
+#                 raise
+#             OutgoingTransaction.objects.filter(id__in=id_array).update(executed_at=datetime.datetime.now(), txid=result)
+#             db_transaction.commit()
+#             transaction = bitcoind.gettransaction(result)
+#             if Decimal(transaction['fee']) < Decimal(0):
+#                 fw = fee_wallet()
+#                 fee_amount = Decimal(transaction['fee']) * Decimal(-1)
+#                 i = 1
+#                 for ot in ot_array:
+#                     wt = ot.wallettransaction_set.all()[0]
+#                     fee_transaction = WalletTransaction.objects.create(
+#                         amount=(Decimal(fee_amount) * Decimal(-1) / Decimal(i)).quantize(Decimal("0.000001")),
+#                         from_wallet_id=wt.from_wallet_id,
+#                         to_wallet=fw,
+#                         description="Bitcoin network transaction fee")
+#                     i += 1
+#             db_transaction.commit()
+#     elif OutgoingTransaction.objects.filter(executed_at=None).count()>0:
+#         next_run_at = OutgoingTransaction.objects.filter(executed_at=None).aggregate(Min('expires_at'))['expires_at__min']
+#         process_outgoing_transactions.retry(
+#             countdown=((next_run_at - datetime.datetime.now()) + datetime.timedelta(seconds=2)).total_seconds() )
 
 
 @task()

@@ -21,16 +21,20 @@ class Command(NoArgsCommand):
 
     def handle_noargs(self, **options):
         # BitcoinAddress.objects.filter(active=True)
-        bitcoinaddress_sum = sum([x.received() for x in BitcoinAddress.objects.filter(active=True)])
+        bitcoinaddress_sum = BitcoinAddress.objects.filter(active=True)\
+            .aggregate(Sum('least_received_confirmed'))['least_received_confirmed__sum'] or Decimal(0)
         print "Total received, sum", bitcoinaddress_sum
-        transaction_wallets_sum = sum([x.amount for x in WalletTransaction.objects.filter(from_wallet__id__gt=0, to_wallet__id__gt=0)])
+        transaction_wallets_sum = WalletTransaction.objects.filter(from_wallet__id__gt=0, to_wallet__id__gt=0)\
+            .aggregate(Sum('amount'))['amount__sum'] or Decimal(0)
         print "Total transactions, sum", transaction_wallets_sum
-        transaction_out_sum = sum([x.amount for x in WalletTransaction.objects.filter(from_wallet__id__gt=0)\
-        	.exclude(to_bitcoinaddress="").exclude(to_bitcoinaddress="")])
+        transaction_out_sum = WalletTransaction.objects.filter(from_wallet__id__gt=0)\
+        	.exclude(to_bitcoinaddress="").exclude(to_bitcoinaddress="")\
+            .aggregate(Sum('amount'))['amount__sum'] or Decimal(0)
         print "Total outgoing, sum", transaction_out_sum
         # for x in WalletTransaction.objects.filter(from_wallet__id__gt=0, to_wallet__isnull=True, to_bitcoinaddress=""):
         # 	print x.amount, x.created_at
-        fee_sum = sum([x.amount for x in WalletTransaction.objects.filter(from_wallet__id__gt=0, to_wallet__isnull=True, to_bitcoinaddress="")])
+        fee_sum = WalletTransaction.objects.filter(from_wallet__id__gt=0, to_wallet__isnull=True, to_bitcoinaddress="")\
+            .aggregate('amount')['amount__sum'] or Decimal(0)
         print "Fees, sum", fee_sum
         print "DB balance", (bitcoinaddress_sum - transaction_out_sum - fee_sum)
         print "----"
@@ -50,9 +54,11 @@ class Command(NoArgsCommand):
         tot_received = WalletTransaction.objects.filter(from_wallet=None).aggregate(Sum('amount'))['amount__sum'] or Decimal(0)
         tot_received_bitcoinaddress = BitcoinAddress.objects.filter(migrated_to_transactions=True)\
             .aggregate(Sum('least_received_confirmed'))['least_received_confirmed__sum'] or Decimal(0)
+        tot_received_unmigrated = BitcoinAddress.objects.filter(migrated_to_transactions=False)\
+            .aggregate(Sum('least_received_confirmed'))['least_received_confirmed__sum'] or Decimal(0)
         if tot_received != tot_received_bitcoinaddress:
             raise Exception("wrong total receive amount! "+str(ba.address))
-        print "Total " + str(tot_received) + " BTC deposits migrated"
+        print "Total " + str(tot_received) + " BTC deposits migrated, unmigrated " + str(tot_received_unmigrated) + " BTC"
         print "Migration check #2"
         for ba in BitcoinAddress.objects.filter(migrated_to_transactions=False):
             dts = ba.deposittransaction_set.filter(address=ba)

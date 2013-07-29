@@ -1,4 +1,4 @@
-from django.core.management.base import NoArgsCommand
+from django.core.management.base import NoArgsCommand, BaseCommand
 from django.conf import settings
 import os
 import sys
@@ -21,6 +21,9 @@ from django.core.cache import cache
 
 from django.db import transaction
 
+from optparse import make_option
+from django.contrib.auth.models import User
+
 
 @transaction.commit_manually
 def flush_transaction():
@@ -35,14 +38,26 @@ def CacheLock(key, lock=None, blocking=True, timeout=10):
 
 import pytz  # 3rd party
 
-class Command(NoArgsCommand):
-    help = 'Create a profile object for users which do not have one.'
+class Command(BaseCommand):
+    option_list = BaseCommand.option_list + (
+        make_option("-u", "--users",
+            action='store', type="str", dest="users"),
+        )
+    help = 'This creates the revenue report for a specific month.'
 
-    def handle_noargs(self, **options):
+    def handle(self, *args, **options):
 
         dt_now = datetime.datetime.now()
 
-        for w in Wallet.objects.all():
+        wallet_query = Wallet.objects.all()
+
+        if options['users']:
+            w_ids = []
+            for u in options['users'].split(","):
+                w_ids.append(User.objects.get(username=u).get_profile().wallet.id)
+            wallet_query = wallet_query.filter(id__in=w_ids)
+
+        for w in wallet_query:
             for ba in BitcoinAddress.objects.filter(wallet=w).exclude(migrated_to_transactions=True):
                 original_balance = ba.wallet.last_balance
                 with CacheLock('query_bitcoind_'+str(ba.id)):
