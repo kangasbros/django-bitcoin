@@ -100,6 +100,12 @@ class OutgoingTransaction(models.Model):
         return unicode(self.created_at) + ": " + self.to_bitcoinaddress + u", " + unicode(self.amount)
 
 @task()
+def update_wallet_balance(wallet_id):
+    with CacheLock('update_wallet_balance_'+str(wallet_id)):
+        w = Wallet.objects.get(id=wallet_id)
+        Wallet.objects.filter(id=wallet_id).update(last_balance=w.total_balance_sql())
+
+@task()
 @db_transaction.commit_manually
 def process_outgoing_transactions():
     with CacheLock('process_outgoing_transactions'):
@@ -117,6 +123,7 @@ def process_outgoing_transactions():
                 fee_transaction = WalletTransaction.objects.create(
                     amount=Decimal(transaction['fee']) * Decimal(-1),
                     from_wallet_id=wt.from_wallet_id)
+                update_wallet_balance.delay(wt.from_wallet_id)
             db_transaction.commit()
 
 # TODO: Group outgoing transactions to save on tx fees
@@ -177,13 +184,6 @@ def process_outgoing_transactions():
 #         next_run_at = OutgoingTransaction.objects.filter(executed_at=None).aggregate(Min('expires_at'))['expires_at__min']
 #         process_outgoing_transactions.retry(
 #             countdown=((next_run_at - datetime.datetime.now()) + datetime.timedelta(seconds=2)).total_seconds() )
-
-
-@task()
-def update_wallet_balance(wallet_id):
-    with CacheLock('update_wallet_balance_'+str(wallet_id)):
-        w = Wallet.objects.get(id=wallet_id)
-        Wallet.objects.filter(id=wallet_id).update(last_balance=w.total_balance_sql())
 
 
 class BitcoinAddress(models.Model):

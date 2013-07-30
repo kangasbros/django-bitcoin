@@ -34,14 +34,13 @@ class Command(NoArgsCommand):
         # for x in WalletTransaction.objects.filter(from_wallet__id__gt=0, to_wallet__isnull=True, to_bitcoinaddress=""):
         # 	print x.amount, x.created_at
         fee_sum = WalletTransaction.objects.filter(from_wallet__id__gt=0, to_wallet__isnull=True, to_bitcoinaddress="")\
-            .aggregate('amount')['amount__sum'] or Decimal(0)
+            .aggregate(Sum('amount'))['amount__sum'] or Decimal(0)
         print "Fees, sum", fee_sum
         print "DB balance", (bitcoinaddress_sum - transaction_out_sum - fee_sum)
         print "----"
         bitcoind_balance = bitcoind.bitcoind_api.getbalance()
         print "Bitcoind balance", bitcoind_balance
         print "----"
-        from django.db.models import Avg, Max, Min, Sum
         print "Wallet quick check"
         total_sum = Decimal(0)
         for w in Wallet.objects.filter(last_balance__lt=0):
