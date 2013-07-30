@@ -60,10 +60,9 @@ class Command(NoArgsCommand):
         print "Total " + str(tot_received) + " BTC deposits migrated, unmigrated " + str(tot_received_unmigrated) + " BTC"
         print "Migration check #2"
         for ba in BitcoinAddress.objects.filter(migrated_to_transactions=False):
-            dts = ba.deposittransaction_set.filter(address=ba)
-            for dp in dts:
-                if dp.transaction:
-                    print "Bitcoinaddress migration error!", ba.address
+            dts = ba.deposittransaction_set.filter(address=ba).exclude(transaction=None)
+            if dts.count() > 0:
+                print "Illegal transaction!", dts
         print "BitcoinAddress check"
         for ba in BitcoinAddress.objects.filter(migrated_to_transactions=True):
             dts = ba.deposittransaction_set.filter(address=ba, confirmations__gte=settings.BITCOIN_MINIMUM_CONFIRMATIONS)
