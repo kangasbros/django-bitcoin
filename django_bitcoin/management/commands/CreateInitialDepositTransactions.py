@@ -64,7 +64,7 @@ class Command(BaseCommand):
                     dts = DepositTransaction.objects.filter(address=ba, wallet=ba.wallet)
                     for dp in dts:
                         wt = WalletTransaction.objects.create(amount=dp.amount, to_wallet=ba.wallet, created_at=ba.created_at,
-                        description=ba.address)
+                        description=ba.address, deposit_address=ba)
                         DepositTransaction.objects.filter(id=dp.id).update(transaction=wt)
                     s = dts.aggregate(Sum('amount'))['amount__sum'] or Decimal(0)
                     if s < ba.least_received_confirmed and ba.least_received_confirmed > 0:
