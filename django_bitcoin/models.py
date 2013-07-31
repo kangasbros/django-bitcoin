@@ -711,9 +711,11 @@ class Wallet(models.Model):
         Returns a "greater or equal than minimum"  total ammount received at
         this wallet with the given confirmations at the given timeframe.
         """
-        if minconf < settings.BITCOIN_MINIMUM_CONFIRMATIONS:
+        if minconf == settings.BITCOIN_MINIMUM_CONFIRMATIONS:
+            return self.total_balance_sql(True)
+        elif minconf == 0:
             return self.total_balance_sql(False)
-        return self.total_balance_sql(True)
+        raise Exception("Incorrect minconf parameter")
 
     def total_balance_sql(self, confirmed=True):
         from django.db import connection
