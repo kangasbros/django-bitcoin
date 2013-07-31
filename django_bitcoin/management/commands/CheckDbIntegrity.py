@@ -89,7 +89,7 @@ class Command(NoArgsCommand):
         for ba in BitcoinAddress.objects.filter(migrated_to_transactions=True):
             dts = ba.deposittransaction_set.filter(address=ba, confirmations__gte=settings.BITCOIN_MINIMUM_CONFIRMATIONS)
             deposit_sum = dts.aggregate(Sum('amount'))['amount__sum'] or Decimal(0)
-            wt_sum = WalletTransaction.objects.filter(deposit_address=ba)
+            wt_sum = WalletTransaction.objects.filter(deposit_address=ba).aggregate(Sum('amount'))['amount__sum'] or Decimal(0)
             if wt_sum != deposit_sum or ba.least_received_confirmed != deposit_sum:
                 print "Bitcoinaddress integrity error!", ba.address, deposit_sum, wt_sum, ba.least_received_confirmed
             # if random.random() < 0.001:
