@@ -62,6 +62,8 @@ class Command(NoArgsCommand):
         dts = DepositTransaction.objects.filter(address__migrated_to_transactions=False).exclude(transaction=None)
         if dts.count() > 0:
             print "Illegal transaction!", dts
+        if WalletTransaction.objects.filter(from_wallet=None, deposit_address=None).count() > 0:
+            print "Illegal deposit transactions!"
         print "Wallet check"
         for w in Wallet.objects.filter(last_balance__gt=0):
             lb = w.last_balance
@@ -87,10 +89,7 @@ class Command(NoArgsCommand):
         for ba in BitcoinAddress.objects.filter(migrated_to_transactions=True):
             dts = ba.deposittransaction_set.filter(address=ba, confirmations__gte=settings.BITCOIN_MINIMUM_CONFIRMATIONS)
             deposit_sum = dts.aggregate(Sum('amount'))['amount__sum'] or Decimal(0)
-            wt_sum = Decimal(0)
-            for dp in dts:
-                if dp.transaction:
-                    wt_sum += dp.transaction.amount
+            wt_sum = WalletTransaction.objects.get()
             if wt_sum != deposit_sum or ba.least_received_confirmed != deposit_sum:
                 print "Bitcoinaddress integrity error!", ba.address, deposit_sum, wt_sum, ba.least_received_confirmed
             # if random.random() < 0.001:

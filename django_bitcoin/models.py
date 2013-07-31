@@ -117,6 +117,7 @@ def process_outgoing_transactions():
                 result = bitcoind.send(ot.to_bitcoinaddress, ot.amount)
             except jsonrpc.JSONRPCException:
                 raise
+            OutgoingTransaction.objects.filter(id=ot.id).update(txid=result)
             transaction = bitcoind.gettransaction(result)
             if Decimal(transaction['fee']) < Decimal(0):
                 wt = ot.wallettransaction_set.all()[0]
