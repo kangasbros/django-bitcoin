@@ -711,51 +711,9 @@ class Wallet(models.Model):
         Returns a "greater or equal than minimum"  total ammount received at
         this wallet with the given confirmations at the given timeframe.
         """
-        if minconf == 0: return (0, self.total_received(0) - self.total_sent())
-
-        if not transactions: transactions = {}
-
-        if not timeframe:
-            oldest_unconfirmed = self.update_transaction_cache(minconf)
-        else:
-            oldest_unconfirmed = None
-
-        csum = sum([a.received(minconf=minconf) for a in self.addresses.all()])
-        usum = sum([a.received(minconf=0) for a in self.addresses.all()]) -csum
-
-        received = self.received_transactions.all()
-        sent = self.sent_transactions.all()
-        if timeframe:
-            received = received.filter(created_at__lt=timeframe)
-            sent = sent.filter(created_at__lt=timeframe)
-
-        def get_t(x):
-            if not (x.id,minconf) in transactions:
-                unc, conf, txs = x.confirmation_status(minconf,transactions)
-                transactions.update(txs)
-                transactions[(x.id, minconf)]= (unc, conf)
-            return transactions[(x.id,minconf)]
-
-        for t in received.order_by('created_at'):
-            if oldest_unconfirmed and t.created_at < oldest_unconfirmed:
-                csum += t.amount
-            else:
-                u,c = get_t(t)
-                usum += u
-                csum += c
-
-        for t in sent.order_by('created_at'):
-            if oldest_unconfirmed and t.created_at < oldest_unconfirmed:
-                csum -= t.amount
-            else:
-                u,c = get_t(t)
-                usum -= u
-                csum -= c
-
-        if not timeframe:
-            return (usum, csum)  # return of a non recursive call
-        else:
-            return (usum, csum, transactions)  # return of a recursive call
+        if minconf < settings.BITCOIN_MINIMUM_CONFIRMATIONS:
+            return self.total_balance_sql(False)
+        return self.total_balance_sql(True)
 
     def total_balance_sql(self, confirmed=True):
         from django.db import connection
