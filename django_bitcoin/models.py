@@ -111,12 +111,12 @@ def process_outgoing_transactions():
     with CacheLock('process_outgoing_transactions'):
         for ot in OutgoingTransaction.objects.filter(executed_at=None):
             result = None
+            OutgoingTransaction.objects.filter(id=ot.id).update(executed_at=datetime.datetime.now(), txid=result)
+            db_transaction.commit()
             try:
                 result = bitcoind.send(ot.to_bitcoinaddress, ot.amount)
             except jsonrpc.JSONRPCException:
                 raise
-            OutgoingTransaction.objects.filter(id=ot.id).update(executed_at=datetime.datetime.now(), txid=result)
-            db_transaction.commit()
             transaction = bitcoind.gettransaction(result)
             if Decimal(transaction['fee']) < Decimal(0):
                 wt = ot.wallettransaction_set.all()[0]
@@ -124,7 +124,7 @@ def process_outgoing_transactions():
                     amount=Decimal(transaction['fee']) * Decimal(-1),
                     from_wallet_id=wt.from_wallet_id)
                 update_wallet_balance.delay(wt.from_wallet_id)
-            db_transaction.commit()
+        db_transaction.commit()
 
 # TODO: Group outgoing transactions to save on tx fees
 

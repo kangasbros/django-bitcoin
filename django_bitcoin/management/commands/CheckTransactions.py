@@ -38,10 +38,11 @@ class Command(NoArgsCommand):
                             last_check_time = int(t['time'])
                         except BitcoinAddress.DoesNotExist:
                             pass
-                    elif Decimal(-1)*Decimal(str(t[u'amount'])) == dps[0].amount and dps.count()==1 and \
-                        int(t[u'confirmations']) < settings.BITCOIN_MINIMUM_CONFIRMATIONS:
+                    elif Decimal(-1)*Decimal(str(t[u'amount'])) == dps[0].amount and dps.count()==1:
                         dp = dps[0]
                         DepositTransaction.objects.filter(id=dp.id).update(confirmations=int(t[u'confirmations']))
+                        if int(t[u'confirmations']) >= settings.BITCOIN_MINIMUM_CONFIRMATIONS:
+                            dp.query_bitcoind(triggered_tx=t[u'txid'])
                 elif not last_check_time:
                     last_check_time = int(t['time'])
             print "done listtransactions checking, starting checking least_received>least_received_confirmed", time() - start_time

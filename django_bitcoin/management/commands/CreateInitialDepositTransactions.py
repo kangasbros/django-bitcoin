@@ -93,12 +93,10 @@ class Command(BaseCommand):
                 if tot_received != tot_received_bitcoinaddress:
                     raise Exception("wrong total receive amount! "+str(ba.address))
 
-        for ba in BitcoinAddress.objects.filter(migrated_to_transactions=True):
-            dts = ba.deposittransaction_set.filter(address=ba)
-            deposit_sum = dts.aggregate(Sum('amount'))['amount__sum'] or Decimal(0)
-            wt_sum = Decimal(0)
-            for dp in dts:
-                if dp.transaction:
-                    wt_sum += dp.transaction.amount
-            if wt_sum != deposit_sum or ba.least_received_confirmed != deposit_sum:
-                print "Bitcoinaddress integrity error!", ba.address, deposit_sum, wt_sum, ba.least_received_confirmed
+        print "Migrated, doing final check..."
+        tot_received = WalletTransaction.objects.filter(from_wallet=None).aggregate(Sum('amount'))['amount__sum'] or Decimal(0)
+        tot_received_bitcoinaddress = BitcoinAddress.objects.filter(migrated_to_transactions=True)\
+            .aggregate(Sum('least_received_confirmed'))['least_received_confirmed__sum'] or Decimal(0)
+        if tot_received != tot_received_bitcoinaddress:
+            raise Exception("wrong total receive amount! "+str(ba.address))
+        print "Final check succesfull."
