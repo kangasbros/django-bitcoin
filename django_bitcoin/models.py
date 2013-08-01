@@ -197,7 +197,7 @@ class BitcoinAddress(models.Model):
 
     wallet = models.ForeignKey("Wallet", null=True, related_name="addresses")
 
-    migrated_to_transactions = models.BooleanField(default=False)
+    migrated_to_transactions = models.BooleanField(default=True)
 
     class Meta:
         verbose_name_plural = 'Bitcoin addresses'
