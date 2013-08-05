@@ -242,14 +242,21 @@ class BitcoinAddress(models.Model):
                     update_wallet_balance.delay(self.wallet.id)
 
             elif r > self.least_received:
+                transaction_amount = r - self.least_received
                 if settings.BITCOIN_TRANSACTION_SIGNALING:
                     if self.wallet:
-                        balance_changed.send(sender=self.wallet, changed=(r - self.least_received), bitcoinaddress=self)
+                        balance_changed.send(sender=self.wallet, changed=(transaction_amount), bitcoinaddress=self)
                 # self.least_received = r
                 # self.save()
-                BitcoinAddress.objects.filter(id=self.id).update(least_received=r)
-                if self.wallet:
-                    DepositTransaction.objects.create(address=self, amount=r - self.least_received, wallet=self.wallet,
+                updated = BitcoinAddress.objects.filter(id=self.id, least_received=self.least_received).update(least_received=r)
+                if self.wallet and minconf==0 and updated:
+                    dps = DepositTransaction.objects.filter(address=self, transaction=None,
+                        amount__lte=transaction_amount, wallet=self.wallet).extra(
+                            select={'exact_match': "amount="+str(transaction_amount)}
+                        ).order_by("-exact_match", "id")
+                    total_confirmed_amount = Decimal(0)
+                    confirmed_dps = []
+                    DepositTransaction.objects.create(address=self, amount=transaction_amount, wallet=self.wallet,
                         confirmations=0, txid=triggered_tx)
             return r
 
