@@ -84,7 +84,7 @@ class Command(NoArgsCommand):
             dts = DepositTransaction.objects.filter(address=ba, wallet=ba.wallet)
             s = dts.aggregate(Sum('amount'))['amount__sum'] or Decimal(0)
             if s != ba.least_received:
-                print "DepositTransaction error", ba.address, dts, s
+                print "DepositTransaction error", ba.address, ba.least_received, s
                 print "BitcoinAddress check"
         for ba in BitcoinAddress.objects.filter(migrated_to_transactions=True):
             dts = ba.deposittransaction_set.filter(address=ba, confirmations__gte=settings.BITCOIN_MINIMUM_CONFIRMATIONS)
