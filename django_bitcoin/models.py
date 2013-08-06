@@ -219,10 +219,10 @@ class BitcoinAddress(models.Model):
                     BitcoinAddress.objects.select_for_update().filter(id=self.id).update(least_received=r)
 
                 if self.wallet:
-                    dps = DepositTransaction.objects.filter(address=self, confirmations__lt=minconf,
+                    dps = DepositTransaction.objects.filter(address=self, transaction=None,
                         amount__lte=transaction_amount, wallet=self.wallet).extra(
                             select={'exact_match': "amount="+str(transaction_amount)}
-                        ).order_by("-exact_match", "id")
+                        ).order_by("-exact_match", "-id")
                     total_confirmed_amount = Decimal(0)
                     confirmed_dps = []
                     for dp in dps:
@@ -237,7 +237,8 @@ class BitcoinAddress(models.Model):
                     if self.migrated_to_transactions and updated:
                         wt = WalletTransaction.objects.create(to_wallet=self.wallet, amount=transaction_amount, description=self.address,
                             deposit_address=self)
-                        DepositTransaction.objects.filter(address=self, wallet=self.wallet, id__in=confirmed_dps).update(transaction=wt)
+                        DepositTransaction.objects.select_for_update().filter(address=self, wallet=self.wallet,
+                            id__in=confirmed_dps, transaction=None).update(transaction=wt)
                     update_wallet_balance.delay(self.wallet.id)
 
             elif r > self.least_received:
