@@ -101,7 +101,7 @@ class OutgoingTransaction(models.Model):
 
 @task()
 def update_wallet_balance(wallet_id):
-    with CacheLock('update_wallet_balance_'+str(wallet_id)):
+    with CacheLock('update_wallet_balance'):
         w = Wallet.objects.get(id=wallet_id)
         Wallet.objects.filter(id=wallet_id).update(last_balance=w.total_balance_sql())
 
