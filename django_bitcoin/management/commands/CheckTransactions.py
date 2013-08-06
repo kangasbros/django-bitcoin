@@ -26,7 +26,7 @@ class Command(NoArgsCommand):
         while time() - start_time < float(RUN_TIME_SECONDS):
             print "starting round", time() - start_time
             # print "starting standard", time() - start_time
-            transactions = bitcoind.bitcoind_api.listtransactions("*", 10, 0)
+            transactions = bitcoind.bitcoind_api.listtransactions("*", 50, 0)
             for t in transactions:
                 if t[u'category'] != u'immature' and (not last_check_time or (int(t['time'])) >= last_check_time) and t[u'amount']>0:
                     dps = DepositTransaction.objects.filter(txid=t[u'txid'])
@@ -38,7 +38,7 @@ class Command(NoArgsCommand):
                             last_check_time = int(t['time'])
                         except BitcoinAddress.DoesNotExist:
                             pass
-                    elif Decimal(str(t[u'amount'])) == dps[0].amount and dps.count()==1:
+                    elif Decimal(str(t[u'amount'])) == dps[0].amount and int(t[u'confirmations'])>dps[0].confirmations and dps.count()==1:
                         dp = dps[0]
                         DepositTransaction.objects.filter(id=dp.id).update(confirmations=int(t[u'confirmations']))
                         if int(t[u'confirmations']) >= settings.BITCOIN_MINIMUM_CONFIRMATIONS:
