@@ -56,7 +56,7 @@ class Command(NoArgsCommand):
         tot_received_unmigrated = BitcoinAddress.objects.filter(migrated_to_transactions=False)\
             .aggregate(Sum('least_received_confirmed'))['least_received_confirmed__sum'] or Decimal(0)
         if tot_received != tot_received_bitcoinaddress:
-            raise Exception("wrong total receive amount! "+str(ba.address))
+            raise Exception("wrong total receive amount! "+str(tot_received)+", "+str(tot_received_bitcoinaddress))
         print "Total " + str(tot_received) + " BTC deposits migrated, unmigrated " + str(tot_received_unmigrated) + " BTC"
         print "Migration check #2"
         dts = DepositTransaction.objects.filter(address__migrated_to_transactions=False).exclude(transaction=None)
