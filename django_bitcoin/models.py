@@ -221,7 +221,7 @@ class BitcoinAddress(models.Model):
                 if self.wallet:
                     dps = DepositTransaction.objects.filter(address=self, transaction=None,
                         amount__lte=transaction_amount, wallet=self.wallet).extra(
-                            select={'exact_match': "exchange_deposittransaction.amount="+str(transaction_amount)}
+                            select={'exact_match': "django_bitcoin_deposittransaction.amount="+str(transaction_amount)}
                         ).order_by("-exact_match", "-id")
                     total_confirmed_amount = Decimal(0)
                     confirmed_dps = []
