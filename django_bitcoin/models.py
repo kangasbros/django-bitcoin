@@ -217,7 +217,7 @@ class BitcoinAddress(models.Model):
                 updated = BitcoinAddress.objects.filter(id=self.id, least_received_confirmed=self.least_received_confirmed).update(least_received_confirmed=r)
 
                 if self.least_received < r:
-                    BitcoinAddress.objects.filter(id=self.id).update(least_received=r)
+                    BitcoinAddress.objects.select_for_update().filter(id=self.id).update(least_received=r)
 
                 if self.wallet:
                     dps = DepositTransaction.objects.filter(address=self, confirmations__lt=minconf,
@@ -248,7 +248,7 @@ class BitcoinAddress(models.Model):
                         balance_changed.send(sender=self.wallet, changed=(transaction_amount), bitcoinaddress=self)
                 # self.least_received = r
                 # self.save()
-                updated = BitcoinAddress.objects.filter(id=self.id, least_received=self.least_received).update(least_received=r)
+                updated = BitcoinAddress.objects.select_for_update().filter(id=self.id, least_received=self.least_received).update(least_received=r)
                 if self.wallet and minconf==0 and updated:
                     DepositTransaction.objects.create(address=self, amount=transaction_amount, wallet=self.wallet,
                         confirmations=0, txid=triggered_tx)
