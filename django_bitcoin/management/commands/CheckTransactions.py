@@ -46,7 +46,8 @@ class Command(NoArgsCommand):
                 elif not last_check_time:
                     last_check_time = int(t['time'])
             print "done listtransactions checking, starting checking least_received>least_received_confirmed", time() - start_time
-            for ba in BitcoinAddress.objects.filter(active=True, wallet__isnull=False).extra(where=["least_received>least_received_confirmed"]):
+            for ba in BitcoinAddress.objects.filter(active=True,
+                wallet__isnull=False).extra(where=["least_received>least_received_confirmed"]).order_by("?")[:5]:
                 ba.query_bitcoind()
             print "done, sleeping...", time() - start_time
             sleep(1)
