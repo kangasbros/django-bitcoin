@@ -203,7 +203,7 @@ class BitcoinAddress(models.Model):
         verbose_name_plural = 'Bitcoin addresses'
 
     def query_bitcoind(self, minconf=settings.BITCOIN_MINIMUM_CONFIRMATIONS, triggered_tx=None):
-        with CacheLock('query_bitcoind_'+str(self.id)):
+        with CacheLock('query_bitcoind'):
             r = bitcoind.total_received(self.address, minconf=minconf)
 
             if r > self.least_received_confirmed and \
