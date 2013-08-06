@@ -214,7 +214,7 @@ class BitcoinAddress(models.Model):
                         balance_changed_confirmed.send(sender=self.wallet,
                             changed=(transaction_amount), bitcoinaddress=self)
 
-                updated = BitcoinAddress.objects.filter(id=self.id, least_received_confirmed=self.least_received_confirmed).update(least_received_confirmed=r)
+                updated = BitcoinAddress.objects.select_for_update().filter(id=self.id, least_received_confirmed=self.least_received_confirmed).update(least_received_confirmed=r)
 
                 if self.least_received < r:
                     BitcoinAddress.objects.select_for_update().filter(id=self.id).update(least_received=r)
