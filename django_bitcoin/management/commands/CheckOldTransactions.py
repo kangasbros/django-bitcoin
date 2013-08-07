@@ -29,10 +29,16 @@ class Command(NoArgsCommand):
             addresses = {}
             for t in addresses_json:
                 addresses[t['address']] = Decimal(t['amount'])
-            for ba in BitcoinAddress.objects.filter(active=True, wallet__isnull=False):
-                if ba.address in addresses.keys() and\
-                    ba.least_received < addresses[ba.address]:
-                    ba.query_bitcoind()
-                    ba.query_bitcoind(0)
-            print "finished initial scan", time() - start_time
-            print "starting overall2", time() - start_time
+            print "bitcoind query done"
+            last_id = 0
+            while True:
+                db_addresses = BitcoinAddress.objects.filter(active=True, wallet__isnull=False, id__gte=last_id).order_by("id")[:1000]
+                if len(db_addresses) == 0:
+                    return
+                for ba in db_addresses:
+                    if ba.address in addresses.keys() and\
+                        ba.least_received < addresses[ba.address]:
+                        ba.query_bitcoind()
+                        ba.query_bitcoind(0)
+                    last_id=max(ba.id, last_id)
+                print "finished 1000 scan", time() - start_time, last_id
