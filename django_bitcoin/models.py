@@ -216,13 +216,12 @@ class BitcoinAddress(models.Model):
                 updated = BitcoinAddress.objects.select_for_update().filter(id=self.id, least_received_confirmed=self.least_received_confirmed).update(least_received_confirmed=r)
 
                 if self.least_received < r:
-                    BitcoinAddress.objects.select_for_update().filter(id=self.id).update(least_received=r)
+                    BitcoinAddress.objects.select_for_update().filter(id=self.id,
+                        least_received=self.least_received).update(least_received=r)
 
-                if self.wallet:
+                if self.wallet and updated:
                     dps = DepositTransaction.objects.filter(address=self, transaction=None,
-                        amount__lte=transaction_amount, wallet=self.wallet).extra(
-                            select={'exact_match': "django_bitcoin_deposittransaction.amount="+str(transaction_amount)}
-                        ).order_by("-exact_match", "-id")
+                        amount__lte=transaction_amount, wallet=self.wallet).order_by("-amount", "-id")
                     total_confirmed_amount = Decimal(0)
                     confirmed_dps = []
                     for dp in dps:
