@@ -108,6 +108,7 @@ def update_wallet_balance(wallet_id):
 @db_transaction.commit_manually
 def process_outgoing_transactions():
     with CacheLock('process_outgoing_transactions'):
+        update_wallets = []
         for ot in OutgoingTransaction.objects.filter(executed_at=None):
             result = None
             OutgoingTransaction.objects.filter(id=ot.id).update(executed_at=datetime.datetime.now(), txid=result)
@@ -123,8 +124,10 @@ def process_outgoing_transactions():
                 fee_transaction = WalletTransaction.objects.create(
                     amount=Decimal(transaction['fee']) * Decimal(-1),
                     from_wallet_id=wt.from_wallet_id)
-                update_wallet_balance.delay(wt.from_wallet_id)
+                update_wallets.append(wt.from_wallet_id)
         db_transaction.commit()
+        for wid in update_wallets:
+            update_wallet_balance.delay(wid)
 
 # TODO: Group outgoing transactions to save on tx fees
 
@@ -930,7 +933,8 @@ class HistoricalPrice(models.Model):
 def set_historical_price(curr="EUR"):
     markets = currency.markets_chart()
     # print markets
-    markets_currency = sorted(filter(lambda m: m['currency']==curr and m['volume']>1, markets.values()), key=lambda m: -m['volume'])[:3]
+    markets_currency = sorted(filter(lambda m: m['currency']==curr and m['volume']>1 and not m['symbol'].startswith("mtgox"),
+        markets.values()), key=lambda m: -m['volume'])[:3]
     # print markets_currency
     price = sum([m['avg'] for m in markets_currency]) / len(markets_currency)
     hp = HistoricalPrice.objects.create(price=Decimal(str(price)), params=",".join([m['symbol']+"_avg" for m in markets_currency]), currency=curr,
