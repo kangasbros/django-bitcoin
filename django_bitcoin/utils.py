@@ -54,6 +54,10 @@ class BitcoindConnection(object):
         #print "sending", address, amount
         return self.bitcoind_api.sendtoaddress(address, float(amount), *args, **kwargs)
 
+    def sendmany(self, address_amount_dict, *args, **kwargs):
+        #print "sending", address, amount
+        return self.bitcoind_api.sendmany("", address_amount_dict, *args, **kwargs)
+
     def create_address(self, for_account=None, *args, **kwargs):
         return self.bitcoind_api.getnewaddress(
             for_account or self.account_name, *args, **kwargs)

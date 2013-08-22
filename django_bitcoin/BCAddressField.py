@@ -18,6 +18,8 @@ class BCAddressField(forms.CharField):
     def clean(self, value):
         if not value and not self.required:
             return None
+        if not value.startswith(u"1") and not value.startswith(u"3"):
+            raise ValidationError(self.error_messages['invalid'])
         value = value.strip()
         if re.match(r"[a-zA-Z1-9]{27,35}$", value) is None:
             raise ValidationError(self.error_messages['invalid'])
@@ -42,7 +44,7 @@ __b58base = len(__b58chars)
 
 
 def b58encode(v):
-    """ encode v, which is a string of bytes, to base58.                                                                                                                                                                                                                             
+    """ encode v, which is a string of bytes, to base58.
     """
 
     long_value = 0L
@@ -56,8 +58,8 @@ def b58encode(v):
         long_value = div
     result = __b58chars[long_value] + result
 
-    # Bitcoin does a little leading-zero-compression:                                                                                                                                                                                                                                    
-    # leading 0-bytes in the input become leading-1s                                                                                                                                                                                                                                     
+    # Bitcoin does a little leading-zero-compression:
+    # leading 0-bytes in the input become leading-1s
     nPad = 0
     for c in v:
         if c == '\0': nPad += 1
@@ -66,7 +68,7 @@ def b58encode(v):
     return (__b58chars[0]*nPad) + result
 
 def b58decode(v, length):
-    """ decode v into a string of len bytes                                                                                                                                                                                                                                                        
+    """ decode v into a string of len bytes
     """
     long_value = 0L
     for (i, c) in enumerate(v[::-1]):
@@ -122,7 +124,7 @@ def get_bcaddress_version(strAddress):
     if addr is None: return None
     version = addr[0]
     checksum = addr[-4:]
-    vh160 = addr[:-4] # Version plus hash160 is what is checksummed                                                                                                                                                                                                        
+    vh160 = addr[:-4] # Version plus hash160 is what is checksummed
     h3=hashlib.sha256(hashlib.sha256(vh160).digest()).digest()
     if h3[0:4] == checksum:
         return ord(version)
