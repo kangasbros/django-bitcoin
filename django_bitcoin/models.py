@@ -107,6 +107,8 @@ def update_wallet_balance(wallet_id):
 @task()
 @db_transaction.commit_manually
 def process_outgoing_transactions():
+    if cache.get("wallet_downtime_utc"):
+        return
     with CacheLock('process_outgoing_transactions'):
         update_wallets = []
         for ot in OutgoingTransaction.objects.filter(executed_at=None):
