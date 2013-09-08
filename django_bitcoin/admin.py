@@ -41,9 +41,11 @@ class WalletTransactionAdmin(admin.ModelAdmin):
 class WalletAdmin(admin.ModelAdmin):
     """Admin ``Wallet``
     """
+    addresses = lambda wallet: wallet.addresses.all()
+    addresses.short_description = 'Addresses'
 
     list_display = ('created_at', 'label', 'updated_at')
-    readonly_fields = ('created_at', 'updated_at', 'addresses', 'transactions_with')
+    readonly_fields = ('created_at', 'updated_at', addresses, 'transactions_with')
 
 
 admin.site.register(models.Transaction, TransactionAdmin)
