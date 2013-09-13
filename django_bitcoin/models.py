@@ -84,7 +84,7 @@ class OutgoingTransaction(models.Model):
     created_at = models.DateTimeField(default=datetime.datetime.now)
     expires_at = models.DateTimeField(default=datetime.datetime.now)
     executed_at = models.DateTimeField(null=True,default=None)
-    under_execution = models.BooleanField(default=False)
+    under_execution = models.BooleanField(default=False) # execution fail
     to_bitcoinaddress = models.CharField(
         max_length=50,
         blank=True)
@@ -113,12 +113,14 @@ def process_outgoing_transactions():
         update_wallets = []
         for ot in OutgoingTransaction.objects.filter(executed_at=None):
             result = None
-            updated = OutgoingTransaction.objects.filter(id=ot.id, executed_at=None).select_for_update().update(executed_at=datetime.datetime.now(), txid=result)
+            updated = OutgoingTransaction.objects.filter(id=ot.id,
+                executed_at=None, txid=None).select_for_update().update(executed_at=datetime.datetime.now(), txid=result)
             db_transaction.commit()
             if updated:
                 try:
                     result = bitcoind.send(ot.to_bitcoinaddress, ot.amount)
                 except jsonrpc.JSONRPCException:
+                    OutgoingTransaction.objects.filter(id=ot.id).update(under_execution=True)
                     raise
                 OutgoingTransaction.objects.filter(id=ot.id).update(txid=result)
                 transaction = bitcoind.gettransaction(result)
@@ -128,6 +130,8 @@ def process_outgoing_transactions():
                         amount=Decimal(transaction['fee']) * Decimal(-1),
                         from_wallet_id=wt.from_wallet_id)
                     update_wallets.append(wt.from_wallet_id)
+            else:
+                raise Exception("Outgoingtransaction can't be updated!")
         db_transaction.commit()
         for wid in update_wallets:
             update_wallet_balance.delay(wid)
@@ -299,7 +303,7 @@ def new_bitcoin_address():
 class Payment(models.Model):
     description = models.CharField(
         max_length=255,
-        blank=True)<
+        blank=True)
     address = models.CharField(
         max_length=50)
     amount = models.DecimalField(
