@@ -32,6 +32,12 @@ def CacheLock(key, lock=None, blocking=True, timeout=10):
 
     return distributedlock(key, lock, blocking)
 
+def NonBlockingCacheLock(key, lock=None, blocking=False, timeout=10):
+    if lock is None:
+        lock = MemcachedLock(key=key, client=cache, timeout=timeout)
+
+    return distributedlock(key, lock, blocking)
+
 balance_changed = django.dispatch.Signal(providing_args=["changed", "transaction", "bitcoinaddress"])
 balance_changed_confirmed = django.dispatch.Signal(providing_args=["changed", "transaction", "bitcoinaddress"])
 
@@ -79,12 +85,12 @@ class DepositTransaction(models.Model):
     def __unicode__(self):
         return self.address.address + u", " + unicode(self.amount)
 
-class BitcoinBlock(models.Model):
-    created_at = models.DateTimeField(default=datetime.datetime.now)
-    blockhash = models.CharField(max_length=100)
-    blockheight = models.IntegerField()
-    confirmations = models.IntegerField(default=0)
-    parent = models.ForeignKey('BitcoinBlock')
+# class BitcoinBlock(models.Model):
+#     created_at = models.DateTimeField(default=datetime.datetime.now)
+#     blockhash = models.CharField(max_length=100)
+#     blockheight = models.IntegerField()
+#     confirmations = models.IntegerField(default=0)
+#     parent = models.ForeignKey('BitcoinBlock')
 
 class OutgoingTransaction(models.Model):
 
@@ -112,11 +118,18 @@ def update_wallet_balance(wallet_id):
     Wallet.objects.filter(id=wallet_id).update(last_balance=w.total_balance_sql())
 
 @task()
-@db_transaction.commit_manually
+# @db_transaction.commit_manually
 def process_outgoing_transactions():
-    if cache.get("wallet_downtime_utc"):
+    if cache.get("process_outgoing_transactions"):
+        print "process ongoing, skipping..."
+        db_transaction.rollback()
         return
-    with CacheLock('process_outgoing_transactions'):
+    if cache.get("wallet_downtime_utc"):
+        db_transaction.rollback()
+        return
+    # try out bitcoind connection
+    print bitcoind.bitcoind_api.getinfo()
+    with NonBlockingCacheLock('process_outgoing_transactions'):
         update_wallets = []
         for ot in OutgoingTransaction.objects.filter(executed_at=None):
             result = None
@@ -126,17 +139,20 @@ def process_outgoing_transactions():
             if updated:
                 try:
                     result = bitcoind.send(ot.to_bitcoinaddress, ot.amount)
-                except jsonrpc.JSONRPCException:
+                except jsonrpc.JSONRPCException as e:
                     OutgoingTransaction.objects.filter(id=ot.id).update(under_execution=True)
+                    print e.error
                     raise
-                OutgoingTransaction.objects.filter(id=ot.id).update(txid=result)
-                transaction = bitcoind.gettransaction(result)
-                if Decimal(transaction['fee']) < Decimal(0):
-                    wt = ot.wallettransaction_set.all()[0]
-                    fee_transaction = WalletTransaction.objects.create(
-                        amount=Decimal(transaction['fee']) * Decimal(-1),
-                        from_wallet_id=wt.from_wallet_id)
-                    update_wallets.append(wt.from_wallet_id)
+                updated2 = OutgoingTransaction.objects.filter(id=ot.id, txid=None).select_for_update().update(txid=result)
+                db_transaction.commit()
+                if updated2:
+                    transaction = bitcoind.gettransaction(result)
+                    if Decimal(transaction['fee']) < Decimal(0):
+                        wt = ot.wallettransaction_set.all()[0]
+                        fee_transaction = WalletTransaction.objects.create(
+                            amount=Decimal(transaction['fee']) * Decimal(-1),
+                            from_wallet_id=wt.from_wallet_id)
+                        update_wallets.append(wt.from_wallet_id)
             else:
                 raise Exception("Outgoingtransaction can't be updated!")
         db_transaction.commit()
