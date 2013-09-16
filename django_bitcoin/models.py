@@ -235,7 +235,6 @@ class BitcoinAddress(models.Model):
         verbose_name_plural = 'Bitcoin addresses'
 
     def query_bitcoind(self, minconf=settings.BITCOIN_MINIMUM_CONFIRMATIONS, triggered_tx=None):
-        raise Exception("Deprecated")
         with CacheLock('query_bitcoind'):
             r = bitcoind.total_received(self.address, minconf=minconf)
 
