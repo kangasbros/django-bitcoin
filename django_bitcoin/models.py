@@ -107,8 +107,15 @@ def update_wallet_balance(wallet_id):
 @task()
 @db_transaction.commit_manually
 def process_outgoing_transactions():
-    if cache.get("wallet_downtime_utc"):
+    if cache.get("process_outgoing_transactions"):
+        print "process ongoing, skipping..."
+        db_transaction.rollback()
         return
+    if cache.get("wallet_downtime_utc"):
+        db_transaction.rollback()
+        return
+    # try out bitcoind connection
+    print bitcoind.bitcoind_api.getinfo()
     with CacheLock('process_outgoing_transactions'):
         update_wallets = []
         for ot in OutgoingTransaction.objects.filter(executed_at=None):
