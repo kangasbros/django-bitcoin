@@ -118,7 +118,7 @@ def update_wallet_balance(wallet_id):
     Wallet.objects.filter(id=wallet_id).update(last_balance=w.total_balance_sql())
 
 @task()
-# @db_transaction.commit_manually
+@db_transaction.commit_manually
 def process_outgoing_transactions():
     if cache.get("process_outgoing_transactions"):
         print "process ongoing, skipping..."
