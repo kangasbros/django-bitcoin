@@ -79,6 +79,13 @@ class DepositTransaction(models.Model):
     def __unicode__(self):
         return self.address.address + u", " + unicode(self.amount)
 
+class BitcoinBlock(models.Model):
+    created_at = models.DateTimeField(default=datetime.datetime.now)
+    blockhash = models.CharField(max_length=100)
+    blockheight = models.IntegerField()
+    confirmations = models.IntegerField(default=0)
+    parent = models.ForeignKey('BitcoinBlock')
+
 class OutgoingTransaction(models.Model):
 
     created_at = models.DateTimeField(default=datetime.datetime.now)
@@ -205,6 +212,7 @@ class BitcoinAddress(models.Model):
         verbose_name_plural = 'Bitcoin addresses'
 
     def query_bitcoind(self, minconf=settings.BITCOIN_MINIMUM_CONFIRMATIONS, triggered_tx=None):
+        raise Exception("Deprecated")
         with CacheLock('query_bitcoind'):
             r = bitcoind.total_received(self.address, minconf=minconf)
 
@@ -255,6 +263,43 @@ class BitcoinAddress(models.Model):
                     DepositTransaction.objects.create(address=self, amount=transaction_amount, wallet=self.wallet,
                         confirmations=0, txid=triggered_tx)
             return r
+
+    def query_bitcoin_deposit(self, deposit_tx):
+        with CacheLock('query_bitcoind'):
+            r = bitcoind.total_received(self.address, minconf=settings.BITCOIN_MINIMUM_CONFIRMATIONS)
+            received_amount = r - self.least_received_confirmed
+
+            if received_amount >= deposit_tx.amount:
+                if settings.BITCOIN_TRANSACTION_SIGNALING:
+                    if self.wallet:
+                        balance_changed_confirmed.send(sender=self.wallet,
+                            changed=(deposit_tx.amount), bitcoinaddress=self)
+
+                updated = BitcoinAddress.objects.select_for_update().filter(id=self.id,
+                    least_received_confirmed=self.least_received_confirmed).update(
+                    least_received_confirmed=self.least_received_confirmed + received_amount)
+
+                if self.wallet and updated:
+                    if self.migrated_to_transactions:
+                        wt = WalletTransaction.objects.create(to_wallet=self.wallet, amount=deposit_tx.amount, description=self.address,
+                            deposit_address=self)
+                        deposit_tx.transaction = wt
+                        DepositTransaction.objects.select_for_update().filter(id=deposit_tx.id).update(transaction=wt)
+                    update_wallet_balance.delay(self.wallet.id)
+            else:
+                raise Exception("Should be never this way")
+            return r
+
+    def query_unconfirmed_deposits(self):
+        r = bitcoind.total_received(self.address, minconf=0)
+        if r > self.least_received:
+            transaction_amount = r - self.least_received
+            if settings.BITCOIN_TRANSACTION_SIGNALING:
+                if self.wallet:
+                    balance_changed.send(sender=self.wallet, changed=(transaction_amount), bitcoinaddress=self)
+            updated = BitcoinAddress.objects.select_for_update().filter(id=self.id, least_received=self.least_received).update(least_received=r)
+            if updated:
+                self.least_received = r
 
     def received(self, minconf=settings.BITCOIN_MINIMUM_CONFIRMATIONS):
         if settings.BITCOIN_TRANSACTION_SIGNALING:

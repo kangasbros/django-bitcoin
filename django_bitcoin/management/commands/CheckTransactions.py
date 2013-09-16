@@ -20,6 +20,7 @@ class Command(NoArgsCommand):
 """
 
     def handle_noargs(self, **options):
+        raise Exception("Deprecated")
         start_time = time()
         last_check_time = None
         print "starting overall1", time() - start_time, datetime.datetime.now()
