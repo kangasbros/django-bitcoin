@@ -32,7 +32,7 @@ class Command(NoArgsCommand):
             print "bitcoind query done"
             last_id = 9999999999999999999
             while True:
-                db_addresses = BitcoinAddress.objects.filter(active=True, wallet__isnull=False, id__lt=last_id).order_by("-id")[:1000]
+                db_addresses = BitcoinAddress.objects.filter(active=True, wallet__isnull=False, id__lt=last_id).order_by("-id")[:10000]
                 if len(db_addresses) == 0:
                     return
                 for ba in db_addresses:
