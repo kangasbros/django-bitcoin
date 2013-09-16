@@ -28,7 +28,7 @@ from distributedlock import distributedlock, MemcachedLock, LockNotAcquiredError
 
 def CacheLock(key, lock=None, blocking=True, timeout=10):
     if lock is None:
-        lock = MemcachedLock(key=key, client=cache, blocking=True, timeout=timeout)
+        lock = MemcachedLock(key=key, client=cache, timeout=timeout)
 
     return distributedlock(key, lock, blocking)
 
