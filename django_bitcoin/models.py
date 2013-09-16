@@ -26,13 +26,13 @@ from django.db import transaction as db_transaction
 from celery import task
 from distributedlock import distributedlock, MemcachedLock, LockNotAcquiredError
 
-def CacheLock(key, lock=None, blocking=True, timeout=10):
+def CacheLock(key, lock=None, blocking=True, timeout=10000):
     if lock is None:
         lock = MemcachedLock(key=key, client=cache, timeout=timeout)
 
     return distributedlock(key, lock, blocking)
 
-def NonBlockingCacheLock(key, lock=None, blocking=False, timeout=10):
+def NonBlockingCacheLock(key, lock=None, blocking=False, timeout=10000):
     if lock is None:
         lock = MemcachedLock(key=key, client=cache, timeout=timeout)
 
