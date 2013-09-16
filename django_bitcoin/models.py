@@ -85,12 +85,12 @@ class DepositTransaction(models.Model):
     def __unicode__(self):
         return self.address.address + u", " + unicode(self.amount)
 
-class BitcoinBlock(models.Model):
-    created_at = models.DateTimeField(default=datetime.datetime.now)
-    blockhash = models.CharField(max_length=100)
-    blockheight = models.IntegerField()
-    confirmations = models.IntegerField(default=0)
-    parent = models.ForeignKey('BitcoinBlock')
+# class BitcoinBlock(models.Model):
+#     created_at = models.DateTimeField(default=datetime.datetime.now)
+#     blockhash = models.CharField(max_length=100)
+#     blockheight = models.IntegerField()
+#     confirmations = models.IntegerField(default=0)
+#     parent = models.ForeignKey('BitcoinBlock')
 
 class OutgoingTransaction(models.Model):
 
