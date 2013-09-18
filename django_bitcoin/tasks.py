@@ -25,10 +25,15 @@ from celery import task
 from distributedlock import distributedlock, MemcachedLock, LockNotAcquiredError
 from django.core.cache import cache
 
+def NonBlockingCacheLock(key, lock=None, blocking=False, timeout=10000):
+    if lock is None:
+        lock = MemcachedLock(key=key, client=cache, timeout=timeout)
+
+    return distributedlock(key, lock, blocking)
+
 @task()
 def query_transactions():
-    if not cache.get("query_transactions_ongoing"):
-        cache.set("query_transactions_ongoing", 1)
+    with NonBlockingCacheLock("query_transactions_ongoing"):
         blockcount = bitcoind.bitcoind_api.getblockcount()
         max_query_block = blockcount - settings.BITCOIN_MINIMUM_CONFIRMATIONS - 1
         if cache.get("queried_block_index"):
@@ -36,8 +41,9 @@ def query_transactions():
         else:
             query_block = blockcount - 100
         blockhash = bitcoind.bitcoind_api.getblockhash(query_block)
-        print query_block, blockhash
+        # print query_block, blockhash
         transactions = bitcoind.bitcoind_api.listsinceblock(blockhash)
+        # print transactions
         transactions = [tx for tx in transactions["transactions"] if tx["category"]=="receive"]
         print transactions
         for tx in transactions:
@@ -46,6 +52,7 @@ def query_transactions():
                 raise Exception(u"Too many addresses!")
             if ba.count() == 0:
                 continue
+            ba = ba[0]
             dps = DepositTransaction.objects.filter(txid=tx[u'txid'], amount=tx['amount'])
             if dps.count() > 1:
                 raise Exception(u"Too many deposittransactions for the same ID!")
@@ -53,11 +60,12 @@ def query_transactions():
                 deposit_tx = DepositTransaction.objects.create(wallet=ba.wallet,
                     address=ba,
                     amount=tx['amount'],
+                    txid=tx[u'txid'],
                     confirmations=int(tx['confirmations']))
                 if deposit_tx.confirmations >= settings.BITCOIN_MINIMUM_CONFIRMATIONS:
                     ba.query_bitcoin_deposit(deposit_tx)
                 else:
-                    ba.query_unconfirmed_deposits(deposit_tx)
+                    ba.query_unconfirmed_deposits()
             elif dps.count() == 1 and dps[0].confirmations < int(tx['confirmations']):
                 deposit_tx = dps[0]
                 if deposit_tx.confirmations < settings.BITCOIN_MINIMUM_CONFIRMATIONS and\
@@ -66,4 +74,3 @@ def query_transactions():
                 DepositTransaction.objects.filter(id=deposit_tx.id).update(confirmations=int(tx['confirmations']))
 
         cache.set("queried_block_index", max_query_block)
-        cache.delete("query_transactions_ongoing")
