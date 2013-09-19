@@ -77,6 +77,7 @@ class DepositTransaction(models.Model):
 
     wallet = models.ForeignKey("Wallet")
 
+    under_execution = models.BooleanField(default=False) # execution fail
     transaction = models.ForeignKey('WalletTransaction', null=True, default=None)
 
     confirmations = models.IntegerField(default=0)
@@ -289,6 +290,9 @@ class BitcoinAddress(models.Model):
             return r
 
     def query_bitcoin_deposit(self, deposit_tx):
+        if deposit_tx.transaction:
+            print "Already has a transaction!"
+            return
         with CacheLock('query_bitcoind'):
             r = bitcoind.total_received(self.address, minconf=settings.BITCOIN_MINIMUM_CONFIRMATIONS)
             received_amount = r - self.least_received_confirmed
@@ -301,10 +305,10 @@ class BitcoinAddress(models.Model):
 
                 updated = BitcoinAddress.objects.select_for_update().filter(id=self.id,
                     least_received_confirmed=self.least_received_confirmed).update(
-                    least_received_confirmed=self.least_received_confirmed + received_amount)
+                    least_received_confirmed=self.least_received_confirmed + deposit_tx.amount)
 
                 if self.wallet and updated:
-                    self.least_received_confirmed = self.least_received_confirmed + received_amount
+                    self.least_received_confirmed = self.least_received_confirmed + deposit_tx.amount
                     if self.least_received < self.least_received_confirmed:
                         updated = BitcoinAddress.objects.select_for_update().filter(id=self.id).update(
                             least_received=self.least_received_confirmed)
@@ -314,6 +318,8 @@ class BitcoinAddress(models.Model):
                         deposit_tx.transaction = wt
                         DepositTransaction.objects.select_for_update().filter(id=deposit_tx.id).update(transaction=wt)
                     update_wallet_balance.delay(self.wallet.id)
+                else:
+                    print "transaction not updated!"
             else:
                 print "This path should not occur, but whatever."
                 # raise Exception("Should be never this way")

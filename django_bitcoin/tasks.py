@@ -51,6 +51,7 @@ def query_transactions():
             if ba.count() > 1:
                 raise Exception(u"Too many addresses!")
             if ba.count() == 0:
+                print "no address found, address", tx[u'address']
                 continue
             ba = ba[0]
             dps = DepositTransaction.objects.filter(txid=tx[u'txid'], amount=tx['amount'])
@@ -66,11 +67,15 @@ def query_transactions():
                     ba.query_bitcoin_deposit(deposit_tx)
                 else:
                     ba.query_unconfirmed_deposits()
-            elif dps.count() == 1 and dps[0].confirmations < int(tx['confirmations']):
+            elif dps.count() == 1 and not dps[0].transaction:
                 deposit_tx = dps[0]
-                if deposit_tx.confirmations < settings.BITCOIN_MINIMUM_CONFIRMATIONS and\
-                    int(tx['confirmations']) >= settings.BITCOIN_MINIMUM_CONFIRMATIONS:
-                    ba.query_bitcoind_deposit(deposit_tx)
-                DepositTransaction.objects.filter(id=deposit_tx.id).update(confirmations=int(tx['confirmations']))
+                if int(tx['confirmations']) >= settings.BITCOIN_MINIMUM_CONFIRMATIONS:
+                    ba.query_bitcoin_deposit(deposit_tx)
+                if int(tx['confirmations']) > deposit_tx.confirmations:
+                    DepositTransaction.objects.filter(id=deposit_tx.id).update(confirmations=int(tx['confirmations']))
+            elif dps.count() == 1:
+                print "already processed", dps[0].txid, dps[0].transaction
+            else:
+                print "FUFFUFUU"
 
         cache.set("queried_block_index", max_query_block)
