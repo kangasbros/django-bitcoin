@@ -297,7 +297,7 @@ class BitcoinAddress(models.Model):
             r = bitcoind.total_received(self.address, minconf=settings.BITCOIN_MINIMUM_CONFIRMATIONS)
             received_amount = r - self.least_received_confirmed
 
-            if received_amount >= deposit_tx.amount:
+            if received_amount >= deposit_tx.amount and not deposit_tx.under_execution:
                 if settings.BITCOIN_TRANSACTION_SIGNALING:
                     if self.wallet:
                         balance_changed_confirmed.send(sender=self.wallet,
@@ -306,6 +306,8 @@ class BitcoinAddress(models.Model):
                 updated = BitcoinAddress.objects.select_for_update().filter(id=self.id,
                     least_received_confirmed=self.least_received_confirmed).update(
                     least_received_confirmed=self.least_received_confirmed + deposit_tx.amount)
+
+                DepositTransaction.objects.select_for_update().filter(id=deposit_tx.id).update(under_execution=True)
 
                 if self.wallet and updated:
                     self.least_received_confirmed = self.least_received_confirmed + deposit_tx.amount

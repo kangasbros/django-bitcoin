@@ -67,7 +67,7 @@ def query_transactions():
                     ba.query_bitcoin_deposit(deposit_tx)
                 else:
                     ba.query_unconfirmed_deposits()
-            elif dps.count() == 1 and not dps[0].transaction:
+            elif dps.count() == 1 and not (dps[0].transaction or dps[0].under_execution):
                 deposit_tx = dps[0]
                 if int(tx['confirmations']) >= settings.BITCOIN_MINIMUM_CONFIRMATIONS:
                     ba.query_bitcoin_deposit(deposit_tx)
