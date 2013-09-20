@@ -238,6 +238,7 @@ class BitcoinAddress(models.Model):
         verbose_name_plural = 'Bitcoin addresses'
 
     def query_bitcoind(self, minconf=settings.BITCOIN_MINIMUM_CONFIRMATIONS, triggered_tx=None):
+        raise Exception("Deprecated")
         with CacheLock('query_bitcoind'):
             r = bitcoind.total_received(self.address, minconf=minconf)
 
@@ -271,7 +272,7 @@ class BitcoinAddress(models.Model):
                         confirmed_dps.append(dp.id)
                     if self.migrated_to_transactions and updated:
                         wt = WalletTransaction.objects.create(to_wallet=self.wallet, amount=transaction_amount, description=self.address,
-                            deposit_address=self)
+                            deposit_address=self, deposit_transaction=deposit_tx)
                         DepositTransaction.objects.select_for_update().filter(address=self, wallet=self.wallet,
                             id__in=confirmed_dps, transaction=None).update(transaction=wt)
                     update_wallet_balance.delay(self.wallet.id)
@@ -307,9 +308,8 @@ class BitcoinAddress(models.Model):
                     least_received_confirmed=self.least_received_confirmed).update(
                     least_received_confirmed=self.least_received_confirmed + deposit_tx.amount)
 
-                DepositTransaction.objects.select_for_update().filter(id=deposit_tx.id).update(under_execution=True)
-
                 if self.wallet and updated:
+                    DepositTransaction.objects.select_for_update().filter(id=deposit_tx.id).update(under_execution=True)
                     self.least_received_confirmed = self.least_received_confirmed + deposit_tx.amount
                     if self.least_received < self.least_received_confirmed:
                         updated = BitcoinAddress.objects.select_for_update().filter(id=self.id).update(
@@ -549,6 +549,7 @@ class WalletTransaction(models.Model):
 
     deposit_address = models.ForeignKey(BitcoinAddress, null=True)
     txid = models.CharField(max_length=100, blank=True, null=True)
+    deposit_transaction = models.OneToOneField(DepositTransaction, null=True)
 
     def __unicode__(self):
         if self.from_wallet and self.to_wallet:
