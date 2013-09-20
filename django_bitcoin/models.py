@@ -813,9 +813,10 @@ class Wallet(models.Model):
         if confirmed == False:
             sql="""
              SELECT IFNULL((SELECT SUM(least_received_confirmed) FROM django_bitcoin_bitcoinaddress ba WHERE ba.wallet_id=%(id)s), 0)
-            + IFNULL((SELECT SUM(amount) FROM django_bitcoin_wallettransaction wt WHERE wt.to_wallet_id=%(id)s), 0)
+            + IFNULL((SELECT SUM(amount) FROM django_bitcoin_wallettransaction wt WHERE wt.to_wallet_id=%(id)s AND wt.from_wallet_id>0), 0)
             - IFNULL((SELECT SUM(amount) FROM django_bitcoin_wallettransaction wt WHERE wt.from_wallet_id=%(id)s), 0) as total_balance;
             """ % {'id': self.id}
+            cursor.execute(sql)
             return cursor.fetchone()[0]
         else:
             sql="""
@@ -879,12 +880,15 @@ class Wallet(models.Model):
             if minconf == settings.BITCOIN_MINIMUM_CONFIRMATIONS:
                 s = self.addresses.filter(migrated_to_transactions=False).aggregate(models.Sum("least_received_confirmed"))['least_received_confirmed__sum'] or Decimal(0)
             elif minconf == 0:
-                s = self.addresses.filter(migrated_to_transactions=False).aggregate(models.Sum("least_received"))['least_received__sum'] or Decimal(0)
+                s = self.addresses.all().aggregate(models.Sum("least_received"))['least_received__sum'] or Decimal(0)
             else:
                 s = sum([a.received(minconf=minconf) for a in self.addresses.filter(migrated_to_transactions=False)])
         else:
             s = sum([a.received(minconf=minconf) for a in self.addresses.filter(migrated_to_transactions=False)])
-        rt = self.received_transactions.aggregate(models.Sum("amount"))['amount__sum'] or Decimal(0)
+        if minconf == 0:
+            rt = self.received_transactions.exclude(from_wallet=None).aggregate(models.Sum("amount"))['amount__sum'] or Decimal(0)
+        else:
+            rt = self.received_transactions.aggregate(models.Sum("amount"))['amount__sum'] or Decimal(0)
         return (s + rt)
 
     def total_sent(self):
