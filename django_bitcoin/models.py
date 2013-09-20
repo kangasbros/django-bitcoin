@@ -810,14 +810,22 @@ class Wallet(models.Model):
     def total_balance_sql(self, confirmed=True):
         from django.db import connection
         cursor = connection.cursor()
-        sql="""
-         SELECT IFNULL((SELECT SUM(%(confirmed)s) FROM django_bitcoin_bitcoinaddress ba WHERE ba.wallet_id=%(id)s AND ba.migrated_to_transactions=0), 0)
-        + IFNULL((SELECT SUM(amount) FROM django_bitcoin_wallettransaction wt WHERE wt.to_wallet_id=%(id)s), 0)
-        - IFNULL((SELECT SUM(amount) FROM django_bitcoin_wallettransaction wt WHERE wt.from_wallet_id=%(id)s), 0) as total_balance;
-        """ % {'confirmed': ("least_received", "least_received_confirmed")[confirmed], 'id': self.id}
-        cursor.execute(sql)
-        self.last_balance = cursor.fetchone()[0]
-        return self.last_balance
+        if confirmed == False:
+            sql="""
+             SELECT IFNULL((SELECT SUM(least_received) FROM django_bitcoin_bitcoinaddress ba WHERE ba.wallet_id=%(id)s), 0)
+            + IFNULL((SELECT SUM(amount) FROM django_bitcoin_wallettransaction wt WHERE wt.to_wallet_id=%(id)s), 0)
+            - IFNULL((SELECT SUM(amount) FROM django_bitcoin_wallettransaction wt WHERE wt.from_wallet_id=%(id)s), 0) as total_balance;
+            """ % {'id': self.id}
+            return cursor.fetchone()[0]
+        else:
+            sql="""
+             SELECT IFNULL((SELECT SUM(least_received_confirmed) FROM django_bitcoin_bitcoinaddress ba WHERE ba.wallet_id=%(id)s AND ba.migrated_to_transactions=0), 0)
+            + IFNULL((SELECT SUM(amount) FROM django_bitcoin_wallettransaction wt WHERE wt.to_wallet_id=%(id)s), 0)
+            - IFNULL((SELECT SUM(amount) FROM django_bitcoin_wallettransaction wt WHERE wt.from_wallet_id=%(id)s), 0) as total_balance;
+            """ % {'id': self.id}
+            cursor.execute(sql)
+            self.last_balance = cursor.fetchone()[0]
+            return self.last_balance
 
     def total_balance(self, minconf=settings.BITCOIN_MINIMUM_CONFIRMATIONS):
         """
@@ -829,8 +837,11 @@ class Wallet(models.Model):
             #         return self.total_balance_sql()
             #     elif mincof == 0:
             #         self.total_balance_sql(False)
-            self.last_balance = self.total_received(minconf) - self.total_sent()
-            return self.last_balance
+            if minconf >= settings.BITCOIN_MINIMUM_CONFIRMATIONS:
+                self.last_balance = self.total_received(minconf) - self.total_sent()
+                return self.last_balance
+            else:
+                return self.total_received(minconf) - self.total_sent()
         else:
             return self.balance(minconf)[1]
 
@@ -868,7 +879,7 @@ class Wallet(models.Model):
             if minconf == settings.BITCOIN_MINIMUM_CONFIRMATIONS:
                 s = self.addresses.filter(migrated_to_transactions=False).aggregate(models.Sum("least_received_confirmed"))['least_received_confirmed__sum'] or Decimal(0)
             elif minconf == 0:
-                s = self.addresses.filter(migrated_to_transactions=False).aggregate(models.Sum("least_received"))['least_received__sum'] or Decimal(0)
+                s = self.addresses.all().aggregate(models.Sum("least_received"))['least_received__sum'] or Decimal(0)
             else:
                 s = sum([a.received(minconf=minconf) for a in self.addresses.filter(migrated_to_transactions=False)])
         else:
