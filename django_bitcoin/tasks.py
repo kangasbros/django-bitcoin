@@ -25,6 +25,8 @@ from celery import task
 from distributedlock import distributedlock, MemcachedLock, LockNotAcquiredError
 from django.core.cache import cache
 
+from django.core.mail import mail_admins
+
 def NonBlockingCacheLock(key, lock=None, blocking=False, timeout=10000):
     if lock is None:
         lock = MemcachedLock(key=key, client=cache, timeout=timeout)
@@ -67,7 +69,7 @@ def query_transactions():
                     ba.query_bitcoin_deposit(deposit_tx)
                 else:
                     ba.query_unconfirmed_deposits()
-            elif dps.count() == 1 and not (dps[0].transaction or dps[0].under_execution):
+            elif dps.count() == 1 and not dps[0].under_execution:
                 deposit_tx = dps[0]
                 if int(tx['confirmations']) >= settings.BITCOIN_MINIMUM_CONFIRMATIONS:
                     ba.query_bitcoin_deposit(deposit_tx)
@@ -169,10 +171,9 @@ def check_integrity():
         # if random.random() < 0.001:
         #     sleep(1)
 
-    out = sys.stdout.getvalue() # release output
+    integrity_test_output = sys.stdout.getvalue() # release output
     # ####
 
     sys.stdout.close()  # close the stream
     sys.stdout = backup # restore original stdout
-
-    print "blaa", out.upper()   # post processing
+    mail_admins("Integrity check", integrity_test_output)
