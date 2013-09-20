@@ -310,6 +310,7 @@ class BitcoinAddress(models.Model):
 
                 if self.wallet and updated:
                     DepositTransaction.objects.select_for_update().filter(id=deposit_tx.id).update(under_execution=True)
+                    deposit_tx.under_execution = True
                     self.least_received_confirmed = self.least_received_confirmed + deposit_tx.amount
                     if self.least_received < self.least_received_confirmed:
                         updated = BitcoinAddress.objects.select_for_update().filter(id=self.id).update(
