@@ -879,7 +879,7 @@ class Wallet(models.Model):
             if minconf == settings.BITCOIN_MINIMUM_CONFIRMATIONS:
                 s = self.addresses.filter(migrated_to_transactions=False).aggregate(models.Sum("least_received_confirmed"))['least_received_confirmed__sum'] or Decimal(0)
             elif minconf == 0:
-                s = self.addresses.all().aggregate(models.Sum("least_received"))['least_received__sum'] or Decimal(0)
+                s = self.addresses.filter(migrated_to_transactions=False).aggregate(models.Sum("least_received"))['least_received__sum'] or Decimal(0)
             else:
                 s = sum([a.received(minconf=minconf) for a in self.addresses.filter(migrated_to_transactions=False)])
         else:
