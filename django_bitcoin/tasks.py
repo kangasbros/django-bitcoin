@@ -58,6 +58,8 @@ def query_transactions():
             ba = ba[0]
             dps = DepositTransaction.objects.filter(txid=tx[u'txid'], amount=tx['amount'])
             if dps.count() > 1:
+                print dps
+                dps.delete()
                 raise Exception(u"Too many deposittransactions for the same ID!")
             elif dps.count() == 0:
                 deposit_tx = DepositTransaction.objects.create(wallet=ba.wallet,
