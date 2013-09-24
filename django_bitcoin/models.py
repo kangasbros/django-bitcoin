@@ -318,7 +318,6 @@ class BitcoinAddress(models.Model):
                     if self.migrated_to_transactions:
                         wt = WalletTransaction.objects.create(to_wallet=self.wallet, amount=deposit_tx.amount, description=self.address,
                             deposit_address=self)
-                        update_wallet_balance.delay(self.wallet.id)
                         deposit_tx.transaction = wt
                         DepositTransaction.objects.select_for_update().filter(id=deposit_tx.id).update(transaction=wt)
                     update_wallet_balance.delay(self.wallet.id)
