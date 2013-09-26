@@ -118,6 +118,8 @@ def update_wallet_balance(wallet_id):
     w = Wallet.objects.get(id=wallet_id)
     Wallet.objects.filter(id=wallet_id).update(last_balance=w.total_balance_sql())
 
+from time import sleep
+
 @task()
 @db_transaction.commit_manually
 def process_outgoing_transactions():
@@ -135,25 +137,32 @@ def process_outgoing_transactions():
         for ot in OutgoingTransaction.objects.filter(executed_at=None)[:3]:
             result = None
             updated = OutgoingTransaction.objects.filter(id=ot.id,
-                executed_at=None, txid=None).select_for_update().update(executed_at=datetime.datetime.now(), txid=result)
+                executed_at=None, txid=None, under_execution=False).select_for_update().update(executed_at=datetime.datetime.now(), txid=result)
             db_transaction.commit()
             if updated:
                 try:
                     result = bitcoind.send(ot.to_bitcoinaddress, ot.amount)
+                    updated2 = OutgoingTransaction.objects.filter(id=ot.id, txid=None).select_for_update().update(txid=result)
+                    db_transaction.commit()
+                    if updated2:
+                        transaction = bitcoind.gettransaction(result)
+                        if Decimal(transaction['fee']) < Decimal(0):
+                            wt = ot.wallettransaction_set.all()[0]
+                            fee_transaction = WalletTransaction.objects.create(
+                                amount=Decimal(transaction['fee']) * Decimal(-1),
+                                from_wallet_id=wt.from_wallet_id)
+                            update_wallets.append(wt.from_wallet_id)
                 except jsonrpc.JSONRPCException as e:
-                    OutgoingTransaction.objects.filter(id=ot.id).update(under_execution=True)
-                    print e.error
-                    raise
-                updated2 = OutgoingTransaction.objects.filter(id=ot.id, txid=None).select_for_update().update(txid=result)
-                db_transaction.commit()
-                if updated2:
-                    transaction = bitcoind.gettransaction(result)
-                    if Decimal(transaction['fee']) < Decimal(0):
-                        wt = ot.wallettransaction_set.all()[0]
-                        fee_transaction = WalletTransaction.objects.create(
-                            amount=Decimal(transaction['fee']) * Decimal(-1),
-                            from_wallet_id=wt.from_wallet_id)
-                        update_wallets.append(wt.from_wallet_id)
+                    if e.error == u"{u'message': u'Insufficient funds', u'code': -4}":
+                        OutgoingTransaction.objects.filter(id=ot.id, txid=None, 
+                            under_execution=False).select_for_update().update(executed_at=None)
+                        db_transaction.commit()
+                        # sleep(10)
+                    else:
+                        OutgoingTransaction.objects.filter(id=ot.id).select_for_update().update(under_execution=True)
+                        db_transaction.commit()
+                        raise
+                
             else:
                 raise Exception("Outgoingtransaction can't be updated!")
         db_transaction.commit()
@@ -178,7 +187,8 @@ def fee_wallet():
 @task()
 @db_transaction.commit_manually
 def process_outgoing_transactions_group():
-    if OutgoingTransaction.objects.filter(executed_at=None, expires_at__lte=datetime.datetime.now()).count()>0:
+    if OutgoingTransaction.objects.filter(executed_at=None, expires_at__lte=datetime.datetime.now()).count()>0 or \
+        OutgoingTransaction.objects.filter(executed_at=None).count()>6:
         with NonBlockingCacheLock('process_outgoing_transactions'):
             ots = OutgoingTransaction.objects.filter(executed_at=None).order_by("expired_at")[:7]
             ots_ids = (ot.id for ot in ots)

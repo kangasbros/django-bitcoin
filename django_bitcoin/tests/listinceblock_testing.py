@@ -52,6 +52,7 @@ for ba in BitcoinAddress.objects.filter(least_received_confirmed__gt=0, migrated
 quit()
 
 python manage.py shell_plus
+import datetime
 from decimal import Decimal
 from django.db.models import Avg, Max, Min, Sum
 for w in Wallet.objects.all():
