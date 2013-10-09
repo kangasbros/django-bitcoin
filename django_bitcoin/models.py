@@ -158,6 +158,7 @@ def process_outgoing_transactions():
                             under_execution=False).select_for_update().update(executed_at=None)
                         db_transaction.commit()
                         # sleep(10)
+                        raise
                     else:
                         OutgoingTransaction.objects.filter(id=ot.id).select_for_update().update(under_execution=True)
                         db_transaction.commit()
@@ -185,17 +186,17 @@ def fee_wallet():
 
 
 @task()
-@db_transaction.commit_manually
+# @db_transaction.commit_manually
 def process_outgoing_transactions_group():
     if OutgoingTransaction.objects.filter(executed_at=None, expires_at__lte=datetime.datetime.now()).count()>0 or \
         OutgoingTransaction.objects.filter(executed_at=None).count()>6:
         with NonBlockingCacheLock('process_outgoing_transactions'):
-            ots = OutgoingTransaction.objects.filter(executed_at=None).order_by("expired_at")[:7]
+            ots = OutgoingTransaction.objects.filter(executed_at=None).order_by("expires_at")[:7]
             ots_ids = (ot.id for ot in ots)
             update_wallets = []
             transaction_hash = {}
             for ot in ots:
-                transaction_hash[ot.to_bitcoinaddress] = ot.amount
+                transaction_hash[ot.to_bitcoinaddress] = float(ot.amount)
             updated = OutgoingTransaction.objects.filter(id__in=ots_ids,
                 executed_at=None).select_for_update().update(executed_at=datetime.datetime.now())
             db_transaction.commit()
@@ -204,8 +205,14 @@ def process_outgoing_transactions_group():
                     result = bitcoind.sendmany(transaction_hash)
                 except jsonrpc.JSONRPCException:
                     print e.error
-                    OutgoingTransaction.objects.exclude(executed_at=None).filter(id__in=ots_ids,
-                        ).select_for_update().update(under_execution=True)
+                    if e.error == u"{u'message': u'Insufficient funds', u'code': -4}":
+                        OutgoingTransaction.objects.exclude(executed_at=None).filter(id__in=ots_ids,
+                        ).select_for_update().update(executed_at=None)
+                        db_transaction.commit()
+                    else:
+                        OutgoingTransaction.objects.exclude(executed_at=None).filter(id__in=ots_ids,
+                            ).select_for_update().update(under_execution=True, txid=e.error)
+                        db_transaction.commit()
                     raise
                 OutgoingTransaction.objects.filter(id__in=id_array).update(executed_at=datetime.datetime.now(), txid=result)
                 db_transaction.commit()
@@ -213,23 +220,28 @@ def process_outgoing_transactions_group():
                 if Decimal(transaction['fee']) < Decimal(0):
                     fw = fee_wallet()
                     fee_amount = Decimal(transaction['fee']) * Decimal(-1)
+                    orig_fee_transaction = WalletTransaction.objects.create(
+                            amount=fee_amount,
+                            from_wallet_id=fw,
+                            to_wallet=None)
                     i = 1
                     for ot_id in ots_ids:
                         wt = WalletTransaction.objects.get(outgoing_transaction__id=ot_id)
                         update_wallets.append(wt.from_wallet_id)
                         fee_transaction = WalletTransaction.objects.create(
-                            amount=(Decimal(fee_amount) * Decimal(-1) / Decimal(i)).quantize(Decimal("0.000001")),
+                            amount=(fee_amount / Decimal(i)).quantize(Decimal("0.00000001")),
                             from_wallet_id=wt.from_wallet_id,
                             to_wallet=fw,
                             description="Bitcoin network transaction fee")
                         i += 1
+            db_transaction.commit()
             for wid in update_wallets:
                 update_wallet_balance.delay(wid)
-            db_transaction.commit()
     elif OutgoingTransaction.objects.filter(executed_at=None).count()>0:
         next_run_at = OutgoingTransaction.objects.filter(executed_at=None).aggregate(Min('expires_at'))['expires_at__min']
-        process_outgoing_transactions.retry(
-            countdown=((next_run_at - datetime.datetime.now()) + datetime.timedelta(seconds=5)).total_seconds() )
+        if next_run_at:
+            process_outgoing_transactions.retry(
+                countdown=((next_run_at - datetime.datetime.now()) + datetime.timedelta(seconds=5)).total_seconds() )
 
 
 class BitcoinAddress(models.Model):

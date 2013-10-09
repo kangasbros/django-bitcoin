@@ -24,6 +24,10 @@ for w in Wallet.objects.filter(last_balance__gt=0):
         print "error", w.id, lb, tb_sql
         update_wallet_balance.delay(w.id)
 
+python manage.py shell_plus
+from django_bitcoin.tasks import process_outgoing_group
+process_outgoing_group()
+quit()
 
 from decimal import Decimal
 from django.db.models import Avg, Max, Min, Sum
