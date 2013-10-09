@@ -192,7 +192,7 @@ def process_outgoing_transactions_group():
         OutgoingTransaction.objects.filter(executed_at=None).count()>6:
         with NonBlockingCacheLock('process_outgoing_transactions'):
             ots = OutgoingTransaction.objects.filter(executed_at=None).order_by("expires_at")[:7]
-            ots_ids = (ot.id for ot in ots)
+            ots_ids = [ot.id for ot in ots]
             update_wallets = []
             transaction_hash = {}
             for ot in ots:
@@ -203,18 +203,17 @@ def process_outgoing_transactions_group():
             if updated == len(ots):
                 try:
                     result = bitcoind.sendmany(transaction_hash)
-                except jsonrpc.JSONRPCException:
-                    print e.error
+                except jsonrpc.JSONRPCException as e:
                     if e.error == u"{u'message': u'Insufficient funds', u'code': -4}":
-                        OutgoingTransaction.objects.exclude(executed_at=None).filter(id__in=ots_ids,
-                        ).select_for_update().update(executed_at=None)
+                        u2 = OutgoingTransaction.objects.filter(id__in=ots_ids, under_execution=False
+                            ).select_for_update().update(executed_at=None)
                         db_transaction.commit()
                     else:
-                        OutgoingTransaction.objects.exclude(executed_at=None).filter(id__in=ots_ids,
-                            ).select_for_update().update(under_execution=True, txid=e.error)
+                        u2 = OutgoingTransaction.objects.filter(id__in=ots_ids, under_execution=False).select_for_update().update(under_execution=True, txid=e.error)
+                        # print "error updating", e.error, u2, ots_ids
                         db_transaction.commit()
                     raise
-                OutgoingTransaction.objects.filter(id__in=id_array).update(executed_at=datetime.datetime.now(), txid=result)
+                OutgoingTransaction.objects.filter(id__in=ots_ids).update(txid=result)
                 db_transaction.commit()
                 transaction = bitcoind.gettransaction(result)
                 if Decimal(transaction['fee']) < Decimal(0):
@@ -222,7 +221,7 @@ def process_outgoing_transactions_group():
                     fee_amount = Decimal(transaction['fee']) * Decimal(-1)
                     orig_fee_transaction = WalletTransaction.objects.create(
                             amount=fee_amount,
-                            from_wallet_id=fw,
+                            from_wallet=fw,
                             to_wallet=None)
                     i = 1
                     for ot_id in ots_ids:
@@ -232,7 +231,7 @@ def process_outgoing_transactions_group():
                             amount=(fee_amount / Decimal(i)).quantize(Decimal("0.00000001")),
                             from_wallet_id=wt.from_wallet_id,
                             to_wallet=fw,
-                            description="Bitcoin network transaction fee")
+                            description="fee")
                         i += 1
             db_transaction.commit()
             for wid in update_wallets:
