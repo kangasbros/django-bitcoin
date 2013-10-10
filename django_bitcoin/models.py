@@ -25,6 +25,7 @@ from BCAddressField import is_valid_btc_address
 from django.db import transaction as db_transaction
 from celery import task
 from distributedlock import distributedlock, MemcachedLock, LockNotAcquiredError
+from django.db.models import Avg, Max, Min, Sum
 
 def CacheLock(key, lock=None, blocking=True, timeout=10000):
     if lock is None:
@@ -120,55 +121,55 @@ def update_wallet_balance(wallet_id):
 
 from time import sleep
 
-@task()
-@db_transaction.commit_manually
-def process_outgoing_transactions():
-    if cache.get("process_outgoing_transactions"):
-        print "process ongoing, skipping..."
-        db_transaction.rollback()
-        return
-    if cache.get("wallet_downtime_utc"):
-        db_transaction.rollback()
-        return
-    # try out bitcoind connection
-    print bitcoind.bitcoind_api.getinfo()
-    with NonBlockingCacheLock('process_outgoing_transactions'):
-        update_wallets = []
-        for ot in OutgoingTransaction.objects.filter(executed_at=None)[:3]:
-            result = None
-            updated = OutgoingTransaction.objects.filter(id=ot.id,
-                executed_at=None, txid=None, under_execution=False).select_for_update().update(executed_at=datetime.datetime.now(), txid=result)
-            db_transaction.commit()
-            if updated:
-                try:
-                    result = bitcoind.send(ot.to_bitcoinaddress, ot.amount)
-                    updated2 = OutgoingTransaction.objects.filter(id=ot.id, txid=None).select_for_update().update(txid=result)
-                    db_transaction.commit()
-                    if updated2:
-                        transaction = bitcoind.gettransaction(result)
-                        if Decimal(transaction['fee']) < Decimal(0):
-                            wt = ot.wallettransaction_set.all()[0]
-                            fee_transaction = WalletTransaction.objects.create(
-                                amount=Decimal(transaction['fee']) * Decimal(-1),
-                                from_wallet_id=wt.from_wallet_id)
-                            update_wallets.append(wt.from_wallet_id)
-                except jsonrpc.JSONRPCException as e:
-                    if e.error == u"{u'message': u'Insufficient funds', u'code': -4}":
-                        OutgoingTransaction.objects.filter(id=ot.id, txid=None, 
-                            under_execution=False).select_for_update().update(executed_at=None)
-                        db_transaction.commit()
-                        # sleep(10)
-                        raise
-                    else:
-                        OutgoingTransaction.objects.filter(id=ot.id).select_for_update().update(under_execution=True)
-                        db_transaction.commit()
-                        raise
+# @task()
+# @db_transaction.commit_manually
+# def process_outgoing_transactions():
+#     if cache.get("process_outgoing_transactions"):
+#         print "process ongoing, skipping..."
+#         db_transaction.rollback()
+#         return
+#     if cache.get("wallet_downtime_utc"):
+#         db_transaction.rollback()
+#         return
+#     # try out bitcoind connection
+#     print bitcoind.bitcoind_api.getinfo()
+#     with NonBlockingCacheLock('process_outgoing_transactions'):
+#         update_wallets = []
+#         for ot in OutgoingTransaction.objects.filter(executed_at=None)[:3]:
+#             result = None
+#             updated = OutgoingTransaction.objects.filter(id=ot.id,
+#                 executed_at=None, txid=None, under_execution=False).select_for_update().update(executed_at=datetime.datetime.now(), txid=result)
+#             db_transaction.commit()
+#             if updated:
+#                 try:
+#                     result = bitcoind.send(ot.to_bitcoinaddress, ot.amount)
+#                     updated2 = OutgoingTransaction.objects.filter(id=ot.id, txid=None).select_for_update().update(txid=result)
+#                     db_transaction.commit()
+#                     if updated2:
+#                         transaction = bitcoind.gettransaction(result)
+#                         if Decimal(transaction['fee']) < Decimal(0):
+#                             wt = ot.wallettransaction_set.all()[0]
+#                             fee_transaction = WalletTransaction.objects.create(
+#                                 amount=Decimal(transaction['fee']) * Decimal(-1),
+#                                 from_wallet_id=wt.from_wallet_id)
+#                             update_wallets.append(wt.from_wallet_id)
+#                 except jsonrpc.JSONRPCException as e:
+#                     if e.error == u"{u'message': u'Insufficient funds', u'code': -4}":
+#                         OutgoingTransaction.objects.filter(id=ot.id, txid=None, 
+#                             under_execution=False).select_for_update().update(executed_at=None)
+#                         db_transaction.commit()
+#                         # sleep(10)
+#                         raise
+#                     else:
+#                         OutgoingTransaction.objects.filter(id=ot.id).select_for_update().update(under_execution=True)
+#                         db_transaction.commit()
+#                         raise
                 
-            else:
-                raise Exception("Outgoingtransaction can't be updated!")
-        db_transaction.commit()
-        for wid in update_wallets:
-            update_wallet_balance.delay(wid)
+#             else:
+#                 raise Exception("Outgoingtransaction can't be updated!")
+#         db_transaction.commit()
+#         for wid in update_wallets:
+#             update_wallet_balance.delay(wid)
 
 # TODO: Group outgoing transactions to save on tx fees
 
@@ -186,8 +187,8 @@ def fee_wallet():
 
 
 @task()
-# @db_transaction.commit_manually
-def process_outgoing_transactions_group():
+@db_transaction.commit_manually
+def process_outgoing_transactions():
     if OutgoingTransaction.objects.filter(executed_at=None, expires_at__lte=datetime.datetime.now()).count()>0 or \
         OutgoingTransaction.objects.filter(executed_at=None).count()>6:
         with NonBlockingCacheLock('process_outgoing_transactions'):
@@ -237,10 +238,10 @@ def process_outgoing_transactions_group():
             for wid in update_wallets:
                 update_wallet_balance.delay(wid)
     elif OutgoingTransaction.objects.filter(executed_at=None).count()>0:
-        next_run_at = OutgoingTransaction.objects.filter(executed_at=None).aggregate(Min('expires_at'))['expires_at__min']
+        next_run_at = minOutgoingTransaction.objects.filter(executed_at=None).aggregate(Min('expires_at'))['expires_at__min']
         if next_run_at:
             process_outgoing_transactions.retry(
-                countdown=((next_run_at - datetime.datetime.now()) + datetime.timedelta(seconds=5)).total_seconds() )
+                countdown=min(((next_run_at - datetime.datetime.now()) + datetime.timedelta(seconds=5)).total_seconds(), 0) )
 
 
 class BitcoinAddress(models.Model):
@@ -719,7 +720,7 @@ class Wallet(models.Model):
                     changed=(amount), transaction=transaction)
             return transaction
 
-    def send_to_address(self, address, amount, description=''):
+    def send_to_address(self, address, amount, description='', expires_seconds=2):
         if settings.BITCOIN_DISABLE_OUTGOING:
             raise Exception("Outgoing transactions disabled! contact support.")
         address = address.strip()
@@ -748,7 +749,8 @@ class Wallet(models.Model):
                 print "address transaction concurrency:", new_balance, avail, self.transaction_counter, self.last_balance, self.total_balance()
                 raise Exception(_("Concurrency error with transactions. Please try again."))
             # concurrency check end
-            outgoing_transaction = OutgoingTransaction.objects.create(amount=amount, to_bitcoinaddress=address)
+            outgoing_transaction = OutgoingTransaction.objects.create(amount=amount, to_bitcoinaddress=address, 
+                expires_at=datetime.datetime.now()+datetime.timedelta(seconds=expires_seconds))
             bwt = WalletTransaction.objects.create(
                 amount=amount,
                 from_wallet=self,
