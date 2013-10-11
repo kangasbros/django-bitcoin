@@ -720,7 +720,7 @@ class Wallet(models.Model):
                     changed=(amount), transaction=transaction)
             return transaction
 
-    def send_to_address(self, address, amount, description='', expires_seconds=2):
+    def send_to_address(self, address, amount, description='', expires_seconds=settings.BITCOIN_OUTGOING_DEFAULT_DELAY_SECONDS):
         if settings.BITCOIN_DISABLE_OUTGOING:
             raise Exception("Outgoing transactions disabled! contact support.")
         address = address.strip()
