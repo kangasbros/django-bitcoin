@@ -14,6 +14,7 @@ from django_bitcoin.tasks import check_integrity
 check_integrity()
 quit()
 
+python manage.py shell_plus
 from django_bitcoin.models import update_wallet_balance
 for w in Wallet.objects.filter(last_balance__gt=0):
     lb = w.last_balance
@@ -24,6 +25,10 @@ for w in Wallet.objects.filter(last_balance__gt=0):
         update_wallet_balance.delay(w.id)
 
 python manage.py shell_plus
+from django_bitcoin.tasks import process_outgoing_group
+process_outgoing_group()
+quit()
+
 from decimal import Decimal
 from django.db.models import Avg, Max, Min, Sum
 for ba in BitcoinAddress.objects.filter(least_received_confirmed__gt=0, migrated_to_transactions=True):
@@ -51,6 +56,7 @@ for ba in BitcoinAddress.objects.filter(least_received_confirmed__gt=0, migrated
 quit()
 
 python manage.py shell_plus
+import datetime
 from decimal import Decimal
 from django.db.models import Avg, Max, Min, Sum
 for w in Wallet.objects.all():
@@ -58,3 +64,11 @@ for w in Wallet.objects.all():
         print w.id, w.total_balance(), w.total_balance_sql()
         print w.id, w.total_balance(0), w.total_balance_sql(confirmed=False), w.total_balance_sql(confirmed=False)
 
+from decimal import Decimal
+from django.db.models import Avg, Max, Min, Sum
+for ba in BitcoinAddress.objects.filter(migrated_to_transactions=True):
+        dts = ba.deposittransaction_set.filter(address=ba, confirmations__gte=settings.BITCOIN_MINIMUM_CONFIRMATIONS)
+        deposit_sum = dts.aggregate(Sum('amount'))['amount__sum'] or Decimal(0)
+        wt_sum = WalletTransaction.objects.filter(deposit_address=ba).aggregate(Sum('amount'))['amount__sum'] or Decimal(0)
+        if wt_sum != deposit_sum or ba.least_received_confirmed != deposit_sum:
+            print "Bitcoinaddress integrity error!", ba.address, deposit_sum, wt_sum, ba.least_received_confirmed
