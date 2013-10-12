@@ -155,7 +155,7 @@ from time import sleep
 #                             update_wallets.append(wt.from_wallet_id)
 #                 except jsonrpc.JSONRPCException as e:
 #                     if e.error == u"{u'message': u'Insufficient funds', u'code': -4}":
-#                         OutgoingTransaction.objects.filter(id=ot.id, txid=None, 
+#                         OutgoingTransaction.objects.filter(id=ot.id, txid=None,
 #                             under_execution=False).select_for_update().update(executed_at=None)
 #                         db_transaction.commit()
 #                         # sleep(10)
@@ -164,7 +164,7 @@ from time import sleep
 #                         OutgoingTransaction.objects.filter(id=ot.id).select_for_update().update(under_execution=True)
 #                         db_transaction.commit()
 #                         raise
-                
+
 #             else:
 #                 raise Exception("Outgoingtransaction can't be updated!")
 #         db_transaction.commit()
@@ -187,7 +187,7 @@ def fee_wallet():
 
 
 @task()
-@db_transaction.commit_manually
+# @db_transaction.commit_manually
 def process_outgoing_transactions():
     if OutgoingTransaction.objects.filter(executed_at=None, expires_at__lte=datetime.datetime.now()).count()>0 or \
         OutgoingTransaction.objects.filter(executed_at=None).count()>6:
@@ -238,7 +238,7 @@ def process_outgoing_transactions():
             for wid in update_wallets:
                 update_wallet_balance.delay(wid)
     elif OutgoingTransaction.objects.filter(executed_at=None).count()>0:
-        next_run_at = minOutgoingTransaction.objects.filter(executed_at=None).aggregate(Min('expires_at'))['expires_at__min']
+        next_run_at = OutgoingTransaction.objects.filter(executed_at=None).aggregate(Min('expires_at'))['expires_at__min']
         if next_run_at:
             process_outgoing_transactions.retry(
                 countdown=min(((next_run_at - datetime.datetime.now()) + datetime.timedelta(seconds=5)).total_seconds(), 0) )
@@ -749,7 +749,7 @@ class Wallet(models.Model):
                 print "address transaction concurrency:", new_balance, avail, self.transaction_counter, self.last_balance, self.total_balance()
                 raise Exception(_("Concurrency error with transactions. Please try again."))
             # concurrency check end
-            outgoing_transaction = OutgoingTransaction.objects.create(amount=amount, to_bitcoinaddress=address, 
+            outgoing_transaction = OutgoingTransaction.objects.create(amount=amount, to_bitcoinaddress=address,
                 expires_at=datetime.datetime.now()+datetime.timedelta(seconds=expires_seconds))
             bwt = WalletTransaction.objects.create(
                 amount=amount,
@@ -757,7 +757,7 @@ class Wallet(models.Model):
                 to_bitcoinaddress=address,
                 outgoing_transaction=outgoing_transaction,
                 description=description)
-            process_outgoing_transactions.delay()
+            process_outgoing_transactions.apply_async((), countdown=(expires_seconds+1))
             # try:
             #     result = bitcoind.send(address, amount)
             # except jsonrpc.JSONRPCException:
