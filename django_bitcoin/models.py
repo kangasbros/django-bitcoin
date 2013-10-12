@@ -886,7 +886,7 @@ class Wallet(models.Model):
         else:
             s = sum([a.received(minconf=minconf) for a in self.addresses.filter(migrated_to_transactions=False)])
         if minconf == 0:
-            rt = self.received_transactions.exclude(from_wallet=None).aggregate(models.Sum("amount"))['amount__sum'] or Decimal(0)
+            rt = self.received_transactions.filter(from_wallet__gte=1).aggregate(models.Sum("amount"))['amount__sum'] or Decimal(0)
         else:
             rt = self.received_transactions.aggregate(models.Sum("amount"))['amount__sum'] or Decimal(0)
         return (s + rt)

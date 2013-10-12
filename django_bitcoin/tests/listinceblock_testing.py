@@ -34,18 +34,18 @@ for ba in BitcoinAddress.objects.filter(least_received_confirmed__gt=0, migrated
         print "DepositTransaction error", ba.address, ba.least_received, s
         print "BitcoinAddress check"
         for d in dts:
-            print "d", d.address, d.amount, d.created_at, d.transaction
+            print "d", d.address, d.amount, d.created_at, d.transaction, d.txid
             if not d.transaction and s > ba.least_received:
                 print "DELETED"
                 d.delete()
         for wt in ba.wallettransaction_set.all():
             print "wt", wt.deposit_address, wt.amount, wt.created_at, wt.deposittransaction_set.all()
         if s < ba.least_received:
-            deposit_tx = DepositTransaction.objects.create(wallet=ba.wallet,
-                    address=ba,
-                    amount=ba.least_received - s,
-                    txid="fix_manual",
-                    confirmations=9999)
+            # deposit_tx = DepositTransaction.objects.create(wallet=ba.wallet,
+            #         address=ba,
+            #         amount=ba.least_received - s,
+            #         txid="fix_manual",
+            #         confirmations=9999)
             print "ADDED"
 
 quit()
