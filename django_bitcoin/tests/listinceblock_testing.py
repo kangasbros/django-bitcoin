@@ -25,6 +25,8 @@ for w in Wallet.objects.filter(last_balance__gt=0):
         update_wallet_balance.delay(w.id)
 
 
+
+
 from decimal import Decimal
 from django.db.models import Avg, Max, Min, Sum
 for ba in BitcoinAddress.objects.filter(least_received_confirmed__gt=0, migrated_to_transactions=True):
@@ -50,6 +52,17 @@ for ba in BitcoinAddress.objects.filter(least_received_confirmed__gt=0, migrated
             print "ADDED"
 
 quit()
+
+python manage.py shell_plus
+from decimal import Decimal
+from django.db.models import Avg, Max, Min, Sum
+BitcoinAddress.objects.aggregate(Sum('least_received'))['least_received__sum'] or Decimal(0)
+BitcoinAddress.objects.aggregate(Sum('least_received_confirmed'))['least_received_confirmed__sum'] or Decimal(0)
+bas = BitcoinAddress.objects.extra(where=["least_received>least_received_confirmed",])
+for ba in bas:
+    print ba.address, ba.least_received, ba.least_received_confirmed, ba.wallet.total_balance_sql(), ba.wallet.total_balance_sql(confirmed=False)
+    print ba.wallet.total_balance(), ba.wallet.total_balance_unconfirmed()
+
 
 python manage.py shell_plus
 from decimal import Decimal
