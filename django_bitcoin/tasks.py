@@ -56,7 +56,7 @@ def query_transactions():
                 print "no address found, address", tx[u'address']
                 continue
             ba = ba[0]
-            dps = DepositTransaction.objects.filter(txid=tx[u'txid'], amount=tx['amount'])
+            dps = DepositTransaction.objects.filter(txid=tx[u'txid'], amount=tx['amount'], address=ba)
             if dps.count() > 1:
                 raise Exception(u"Too many deposittransactions for the same ID!")
             elif dps.count() == 0:
