@@ -185,6 +185,15 @@ def fee_wallet():
     cache.set("django_bitcoin_fee_wallet_id", mw.id)
     return mw
 
+def filter_doubles(outgoing_list):
+    ot_ids = []
+    ot_addresses = []
+    for ot in outgoing_list:
+        if ot.to_bitcoinaddress not in ot_addresses:
+            ot_ids.append(ot.id)
+            ot_addresses.append(ot.to_bitcoinaddress)
+    return ot_ids
+
 
 @task()
 @db_transaction.commit_manually
@@ -192,8 +201,8 @@ def process_outgoing_transactions():
     if OutgoingTransaction.objects.filter(executed_at=None, expires_at__lte=datetime.datetime.now()).count()>0 or \
         OutgoingTransaction.objects.filter(executed_at=None).count()>6:
         with NonBlockingCacheLock('process_outgoing_transactions'):
-            ots = OutgoingTransaction.objects.filter(executed_at=None).order_by("expires_at")[:7]
-            ots_ids = [ot.id for ot in ots]
+            ots = OutgoingTransaction.objects.filter(executed_at=None).order_by("expires_at")[:15]
+            ots_ids = filter_doubles(outgoing_list)
             update_wallets = []
             transaction_hash = {}
             for ot in ots:
