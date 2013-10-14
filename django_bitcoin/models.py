@@ -202,7 +202,7 @@ def process_outgoing_transactions():
         OutgoingTransaction.objects.filter(executed_at=None).count()>6:
         with NonBlockingCacheLock('process_outgoing_transactions'):
             ots = OutgoingTransaction.objects.filter(executed_at=None).order_by("expires_at")[:15]
-            ots_ids = filter_doubles(outgoing_list)
+            ots_ids = filter_doubles(ots)
             update_wallets = []
             transaction_hash = {}
             for ot in ots:
