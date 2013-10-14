@@ -196,7 +196,7 @@ def filter_doubles(outgoing_list):
 
 
 @task()
-@db_transaction.commit_manually
+# @db_transaction.commit_manually
 def process_outgoing_transactions():
     if OutgoingTransaction.objects.filter(executed_at=None, expires_at__lte=datetime.datetime.now()).count()>0 or \
         OutgoingTransaction.objects.filter(executed_at=None).count()>6:
