@@ -196,7 +196,7 @@ def filter_doubles(outgoing_list):
 
 
 @task()
-@db_transaction.commit_manually
+@db_transaction.autocommit
 def process_outgoing_transactions():
     if OutgoingTransaction.objects.filter(executed_at=None, expires_at__lte=datetime.datetime.now()).count()>0 or \
         OutgoingTransaction.objects.filter(executed_at=None).count()>6:
@@ -209,7 +209,6 @@ def process_outgoing_transactions():
                 transaction_hash[ot.to_bitcoinaddress] = float(ot.amount)
             updated = OutgoingTransaction.objects.filter(id__in=ots_ids,
                 executed_at=None).select_for_update().update(executed_at=datetime.datetime.now())
-            db_transaction.commit()
             if updated == len(ots):
                 try:
                     result = bitcoind.sendmany(transaction_hash)
@@ -217,14 +216,11 @@ def process_outgoing_transactions():
                     if e.error == u"{u'message': u'Insufficient funds', u'code': -4}":
                         u2 = OutgoingTransaction.objects.filter(id__in=ots_ids, under_execution=False
                             ).select_for_update().update(executed_at=None)
-                        db_transaction.commit()
                     else:
-                        u2 = OutgoingTransaction.objects.filter(id__in=ots_ids, under_execution=False).select_for_update().update(under_execution=True, txid=e.error)
-                        # print "error updating", e.error, u2, ots_ids
-                        db_transaction.commit()
+                        u2 = OutgoingTransaction.objects.filter(id__in=ots_ids, under_execution=False
+                            ).select_for_update().update(under_execution=True, txid=e.error)
                     raise
                 OutgoingTransaction.objects.filter(id__in=ots_ids).update(txid=result)
-                db_transaction.commit()
                 transaction = bitcoind.gettransaction(result)
                 if Decimal(transaction['fee']) < Decimal(0):
                     fw = fee_wallet()
@@ -243,7 +239,6 @@ def process_outgoing_transactions():
                             to_wallet=fw,
                             description="fee")
                         i += 1
-            db_transaction.commit()
             for wid in update_wallets:
                 update_wallet_balance.delay(wid)
     elif OutgoingTransaction.objects.filter(executed_at=None).count()>0:
