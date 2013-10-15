@@ -245,7 +245,7 @@ def process_outgoing_transactions():
         next_run_at = OutgoingTransaction.objects.filter(executed_at=None).aggregate(Min('expires_at'))['expires_at__min']
         if next_run_at:
             process_outgoing_transactions.retry(
-                countdown=max(((next_run_at - datetime.datetime.now(pytz.utc)) + datetime.timedelta(seconds=5)).total_seconds(), 5), 0) )
+                countdown=max(((next_run_at - datetime.datetime.now(pytz.utc)) + datetime.timedelta(seconds=5)).total_seconds(), 5))
 
 
 class BitcoinAddress(models.Model):
