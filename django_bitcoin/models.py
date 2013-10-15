@@ -242,11 +242,11 @@ def process_outgoing_transactions():
                         i += 1
             for wid in update_wallets:
                 update_wallet_balance.delay(wid)
-    elif OutgoingTransaction.objects.filter(executed_at=None).count()>0:
-        next_run_at = OutgoingTransaction.objects.filter(executed_at=None).aggregate(Min('expires_at'))['expires_at__min']
-        if next_run_at:
-            process_outgoing_transactions.retry(
-                countdown=max(((next_run_at - datetime.datetime.now(pytz.utc)) + datetime.timedelta(seconds=5)).total_seconds(), 5))
+    # elif OutgoingTransaction.objects.filter(executed_at=None).count()>0:
+    #     next_run_at = OutgoingTransaction.objects.filter(executed_at=None).aggregate(Min('expires_at'))['expires_at__min']
+    #     if next_run_at:
+    #         process_outgoing_transactions.retry(
+    #             countdown=max(((next_run_at - datetime.datetime.now(pytz.utc)) + datetime.timedelta(seconds=5)).total_seconds(), 5))
 
 
 class BitcoinAddress(models.Model):
