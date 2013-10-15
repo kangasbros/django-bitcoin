@@ -57,6 +57,14 @@ for ba in BitcoinAddress.objects.filter(least_received_confirmed__gt=0, migrated
 
 quit()
 
+import datetime
+import pytz
+next_run_at = OutgoingTransaction.objects.all().aggregate(Min('expires_at'))['expires_at__min']
+countdown=max(((next_run_at - datetime.datetime.now(pytz.utc)) + datetime.timedelta(seconds=5)).total_seconds(), 5)
+if next_run_at:
+    process_outgoing_transactions.retry(
+        countdown=min(((next_run_at - datetime.datetime.now()) + datetime.timedelta(seconds=5)).total_seconds(), 0) )
+
 python manage.py shell_plus
 import datetime
 from decimal import Decimal
