@@ -30,6 +30,12 @@ process_outgoing_group()
 quit()
 
 
+for ot in OutgoingTransaction.objects.filter(under_execution=True):
+    print ot.to_bitcoinaddress, ot.amount, ot.txid
+
+for ot in OutgoingTransaction.objects.filter(txid=None).exclude(executed_at=None):
+    print ot.executed_at, ot.to_bitcoinaddress, ot.amount, ot.txid
+
 
 from decimal import Decimal
 from django.db.models import Avg, Max, Min, Sum

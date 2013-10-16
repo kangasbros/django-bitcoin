@@ -214,7 +214,8 @@ def process_outgoing_transactions():
                 try:
                     result = bitcoind.sendmany(transaction_hash)
                 except jsonrpc.JSONRPCException as e:
-                    if e.error == u"{u'message': u'Insufficient funds', u'code': -4}":
+                    if e.error == u"{u'message': u'Insufficient funds', u'code': -4}" or \
+                        e.error == u"{u'message': u'Insufficient funds', u'code': -6}":
                         u2 = OutgoingTransaction.objects.filter(id__in=ots_ids, under_execution=False
                             ).select_for_update().update(executed_at=None)
                     else:
