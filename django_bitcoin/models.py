@@ -211,7 +211,7 @@ def process_outgoing_transactions():
                 transaction_hash[ot.to_bitcoinaddress] = float(ot.amount)
             updated = OutgoingTransaction.objects.filter(id__in=ots_ids,
                 executed_at=None).select_for_update().update(executed_at=datetime.datetime.now())
-            if updated == len(ots_ids):
+            if updated == len(ots):
                 try:
                     result = bitcoind.sendmany(transaction_hash)
                 except jsonrpc.JSONRPCException as e:
@@ -242,6 +242,8 @@ def process_outgoing_transactions():
                             to_wallet=fw,
                             description="fee")
                         i += 1
+                else:
+                    raise Exception("Updated amount not matchinf transaction amount!")
             for wid in update_wallets:
                 update_wallet_balance.delay(wid)
     # elif OutgoingTransaction.objects.filter(executed_at=None).count()>0:
