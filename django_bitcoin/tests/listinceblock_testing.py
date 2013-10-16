@@ -63,6 +63,8 @@ for ba in BitcoinAddress.objects.filter(least_received_confirmed__gt=0, migrated
 
 quit()
 
+from django_bitcoin.models import process_outgoing_transactions
+
 ots = OutgoingTransaction.objects.filter(txid=None).exclude(executed_at=None).order_by("id")[:3]
 for ot in ots:
     print ot.executed_at, ot.to_bitcoinaddress, ot.amount, ot.txid

@@ -204,13 +204,14 @@ def process_outgoing_transactions():
         with NonBlockingCacheLock('process_outgoing_transactions'):
             ots = OutgoingTransaction.objects.filter(executed_at=None).order_by("expires_at")[:15]
             ots_ids = filter_doubles(ots)
+            ots = OutgoingTransaction.objects.filter(executed_at=None, id__in=ots_ids)
             update_wallets = []
             transaction_hash = {}
             for ot in ots:
                 transaction_hash[ot.to_bitcoinaddress] = float(ot.amount)
             updated = OutgoingTransaction.objects.filter(id__in=ots_ids,
                 executed_at=None).select_for_update().update(executed_at=datetime.datetime.now())
-            if updated == len(ots):
+            if updated == len(ots_ids):
                 try:
                     result = bitcoind.sendmany(transaction_hash)
                 except jsonrpc.JSONRPCException as e:
