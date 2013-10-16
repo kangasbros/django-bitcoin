@@ -72,12 +72,6 @@ for ot in ots:
 
 process_outgoing_transactions()
 
-from decimal import Decimal
-kb = UserProfile.objects.get(user__username="kangasbros")
-kb.wallet.send_to_address("16aoubHNmaC1p5VdJNfinx36Gbky4M8BqH", Decimal('0.0001'), expires_seconds=100)
-kb.wallet.send_to_address("16aoubHNmaC1p5VdJNfinx36Gbky4M8BqH", Decimal('0.000102'), expires_seconds=100)
-kb.wallet.send_to_address("16cHYRnZGBco5JNtkipBUQryExvZtNeNrS", Decimal('0.000101'), expires_seconds=0)
-
 import datetime
 import pytz
 next_run_at = OutgoingTransaction.objects.all().aggregate(Min('expires_at'))['expires_at__min']
