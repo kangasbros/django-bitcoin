@@ -63,6 +63,14 @@ for ba in BitcoinAddress.objects.filter(least_received_confirmed__gt=0, migrated
 
 quit()
 
+ots = OutgoingTransaction.objects.filter(txid=None).exclude(executed_at=None).order_by("id")[:3]
+for ot in ots:
+    print ot.executed_at, ot.to_bitcoinaddress, ot.amount, ot.txid
+    print OutgoingTransaction.objects.filter(id=ot.id).update(executed_at=None)
+
+process_outgoing_transactions()
+
+
 import datetime
 import pytz
 next_run_at = OutgoingTransaction.objects.all().aggregate(Min('expires_at'))['expires_at__min']
