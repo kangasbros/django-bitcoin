@@ -348,7 +348,7 @@ class BitcoinAddress(models.Model):
                             deposit_address=self)
                         deposit_tx.transaction = wt
                         DepositTransaction.objects.select_for_update().filter(id=deposit_tx.id).update(transaction=wt)
-                    update_wallet_balance.delay(self.wallet.id)
+                    self.wallet.update_last_balance(deposit_tx.amount)
                 else:
                     print "transaction not updated!"
             else:
@@ -639,6 +639,12 @@ class Wallet(models.Model):
 
     # track_transaction_value = models.BooleanField(default=False)
 
+    # tries to update instantly, if not succesful updates using sql query (celery task)
+    def update_last_balance(self, amount):
+        if self.__class__.objects.filter(id=self.id, last_balance=self.last_balance
+            ).update(last_balance=(self.last_balance + amount)) < 1:
+            update_wallet_balance.apply_async((self.id,), countdown=1)
+
     def __unicode__(self):
         return u"%s: %s" % (self.label,
                             self.created_at.strftime('%Y-%m-%d %H:%M'))
@@ -713,7 +719,7 @@ class Wallet(models.Model):
             self.last_balance = new_balance
             # updated = Wallet.objects.filter(Q(id=otherWallet.id))\
             #   .update(last_balance=otherWallet.total_balance_sql())
-            update_wallet_balance.delay(otherWallet.id)
+            otherWallet.update_last_balance(amount)
 
             if settings.BITCOIN_TRANSACTION_SIGNALING:
                 balance_changed.send(sender=self,
