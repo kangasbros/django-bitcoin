@@ -204,6 +204,7 @@ def process_outgoing_transactions():
         with NonBlockingCacheLock('process_outgoing_transactions'):
             ots = OutgoingTransaction.objects.filter(executed_at=None).order_by("expires_at")[:15]
             ots_ids = filter_doubles(ots)
+            ots = OutgoingTransaction.objects.filter(executed_at=None, id__in=ots_ids)
             update_wallets = []
             transaction_hash = {}
             for ot in ots:
@@ -241,6 +242,8 @@ def process_outgoing_transactions():
                             to_wallet=fw,
                             description="fee")
                         i += 1
+                else:
+                    raise Exception("Updated amount not matchinf transaction amount!")
             for wid in update_wallets:
                 update_wallet_balance.delay(wid)
     # elif OutgoingTransaction.objects.filter(executed_at=None).count()>0:
