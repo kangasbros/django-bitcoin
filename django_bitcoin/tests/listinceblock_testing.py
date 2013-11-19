@@ -65,7 +65,7 @@ quit()
 
 from django_bitcoin.models import process_outgoing_transactions
 
-ots = OutgoingTransaction.objects.filter(txid=None).exclude(executed_at=None).order_by("id")[:3]
+ots = OutgoingTransaction.objects.filter(txid=None).exclude(executed_at=None).order_by("id")[:2]
 for ot in ots:
     print ot.executed_at, ot.to_bitcoinaddress, ot.amount, ot.txid
     print OutgoingTransaction.objects.filter(id=ot.id).update(executed_at=None)

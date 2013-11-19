@@ -201,9 +201,9 @@ def filter_doubles(outgoing_list):
 def process_outgoing_transactions():
     if OutgoingTransaction.objects.filter(executed_at=None, expires_at__lte=datetime.datetime.now()).count()>0 or \
         OutgoingTransaction.objects.filter(executed_at=None).count()>6:
+        blockcount = bitcoind.bitcoind_api.getblockcount()
         with NonBlockingCacheLock('process_outgoing_transactions'):
-            ots = OutgoingTransaction.objects.filter(executed_at=None).order_by("expires_at")[:15]
-            ots_ids = filter_doubles(ots)
+            ots_ids = filter_doubles(OutgoingTransaction.objects.filter(executed_at=None).order_by("expires_at")[:15])
             ots = OutgoingTransaction.objects.filter(executed_at=None, id__in=ots_ids)
             update_wallets = []
             transaction_hash = {}
