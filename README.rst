@@ -1,5 +1,14 @@
+Please Note! Not maintained.
+============================
+
+Currently ``django-bitcoin`` is not maintained. I don't recommend using it.
+
+If you want to develop it, don't issue pull requests, but create your own fork. Thanks!
+
 Introduction
 ================
+
+
 
 ``django-bitcoin`` is a `Django web framework <http://djangoproject.com/>`_
 application for building Bitcoin web apps.
