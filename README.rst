@@ -151,19 +151,6 @@ After that you can define your balance_changed and balance_changed_confirmed sig
     def balance_changed_confirmed_handler(sender, **kwargs):
         pass
 
-Community
-==========
-
-Currently ``django-bitcoin`` is used at production in
-
-* `localbitcoins.com <http://localbitcoins.com>`_
-
-* `bountychest.com <http://bountychest.com>`_
-
-More to come!
-
-If you have a site using django-bitcoin, drop me an email and I will link to it here.
-
 Support and source code
 =========================
 
